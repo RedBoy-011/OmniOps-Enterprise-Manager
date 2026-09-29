@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "OmniOps Browser Automation Assistant",
+  "version": "1.0.0",
+  "description": "اکستنشن اختصاصی مرورگر کروم جهت اتوماسیون، پایش کلیک‌ها و کنترل فعالیت‌ها در پنل OmniOps Enterprise",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "OmniOps Extension"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

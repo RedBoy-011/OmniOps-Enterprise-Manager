@@ -1,0 +1,6 @@
+{
+  "name": "OmniOps Enterprise Manager",
+  "description": "پلتفرم مدیریت جامع سازمانی، هوش مصنوعی، مانیتورینگ شبکه و ابزارهای اتوماسیون سازمانی",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
