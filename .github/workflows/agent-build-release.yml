@@ -1,0 +1,122 @@
+name: Build & Release OmniOps Windows Agent and Chrome Extension
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+    paths:
+      - 'agent/**'
+      - 'chrome_extension/**'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'نسخه انتشار (مانند 2.4.1)'
+        required: true
+        default: '2.4.1'
+      is_mandatory:
+        description: 'آیا بروزرسانی برای کلاینت‌ها اجباری است؟'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Determine Version
+        id: get_version
+        shell: pwsh
+        run: |
+          if ("${{ github.event.inputs.version }}" -ne "") {
+            $ver = "${{ github.event.inputs.version }}"
+          } elseif ($env:GITHUB_REF -like "refs/tags/v*") {
+            $ver = $env:GITHUB_REF.Substring(11)
+          } else {
+            $ver = "2.4.1"
+          }
+          Write-Output "RELEASE_VERSION=$ver" >> $env:GITHUB_ENV
+          Write-Host "Publishing Version: v$ver"
+
+      - name: Prepare Windows Agent Package
+        shell: pwsh
+        run: |
+          $ReleaseDir = "build/OmniAgent-Windows-v${{ env.RELEASE_VERSION }}"
+          New-Item -ItemType Directory -Path $ReleaseDir -Force | Out-Null
+          
+          # Copy installer scripts and agent service files
+          Copy-Item -Path "agent/*" -Destination $ReleaseDir -Recurse -Force
+          
+          # Compress to standard Zip
+          $ZipOutput = "build/OmniAgent-Windows-v${{ env.RELEASE_VERSION }}.zip"
+          Compress-Archive -Path "$ReleaseDir/*" -DestinationPath $ZipOutput -Force
+          Write-Host "[✓] Created: $ZipOutput"
+
+      - name: Package Chrome Extension (Manifest V3)
+        shell: pwsh
+        run: |
+          $ExtZip = "build/OmniOps-Chrome-Extension-v${{ env.RELEASE_VERSION }}.zip"
+          Compress-Archive -Path "chrome_extension/*" -DestinationPath $ExtZip -Force
+          Write-Host "[✓] Created: $ExtZip"
+
+      - name: Generate Checksums & Version Manifest
+        shell: pwsh
+        run: |
+          cd build
+          $AgentZip = "OmniAgent-Windows-v${{ env.RELEASE_VERSION }}.zip"
+          $ExtZip = "OmniOps-Chrome-Extension-v${{ env.RELEASE_VERSION }}.zip"
+          
+          $AgentHash = (Get-FileHash -Path $AgentZip -Algorithm SHA256).Hash
+          $ExtHash = (Get-FileHash -Path $ExtZip -Algorithm SHA256).Hash
+          
+          "$AgentHash  $AgentZip" | Out-File -FilePath "checksums.sha256" -Encoding ascii
+          "$ExtHash  $ExtZip" | Out-File -FilePath "checksums.sha256" -Append -Encoding ascii
+          
+          # Generate version-manifest.json for central server & agent auto-polling
+          $Manifest = @{
+            "latest_agent_version" = "${{ env.RELEASE_VERSION }}"
+            "release_date" = (Get-Date).ToString("yyyy-MM-dd")
+            "mandatory_update" = [bool]::Parse("${{ github.event.inputs.is_mandatory || 'false' }}")
+            "changelog" = "پشتیبانی کامل از ممیزی دکترینال، پروتکل MCP، رفع باگ سینی سیستم و ارتباط امن وب‌سوکت با سرور"
+            "windows_agent_sha256" = $AgentHash
+            "chrome_extension_sha256" = $ExtHash
+            "download_urls" = @{
+              "windows_agent" = "https://github.com/${{ github.repository }}/releases/download/v${{ env.RELEASE_VERSION }}/$AgentZip"
+              "chrome_extension" = "https://github.com/${{ github.repository }}/releases/download/v${{ env.RELEASE_VERSION }}/$ExtZip"
+            }
+          } | ConvertTo-Json -Depth 4
+          
+          Set-Content -Path "version-manifest.json" -Value $Manifest -Encoding UTF8
+
+      - name: Create GitHub Release & Upload Assets
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        with:
+          tag_name: "v${{ env.RELEASE_VERSION }}"
+          name: "OmniOps Agent & Chrome Extension v${{ env.RELEASE_VERSION }}"
+          draft: false
+          prerelease: false
+          body: |
+            ## بسته رسمی انتشار ایجنت ویندوزی و افزونه کروم OmniOps
+            
+            ### 📦 فایل‌های قابل دانلود:
+            * **پکیج نصب خودکار ایجنت ویندوز:** `OmniAgent-Windows-v${{ env.RELEASE_VERSION }}.zip`
+              * شامل اسکریپت دابل‌کلیک `install-omniagent.bat` با ارتقای خودکار دسترسی Administrator
+              * ایجاد سرویس رسمی ویندوز `OmniOpsAgent` (Auto-restart on boot)
+              * باز کردن خودکار قوانین فایروال پورت ۸۴۴۳ و ۹۰۰۰
+              * سازگار با استانداردهای امنیتی ویندوز ۱۱ و سرور
+            * **افزونه کروم (Manifest V3):** `OmniOps-Chrome-Extension-v${{ env.RELEASE_VERSION }}.zip`
+              * ارتباط Native WebSocket با پورت ۸۴۴۳ محلی
+              * ابزارهای اتوماسیون وب و ارتباط امن با سرور مرکزی
+            * **متادیتای خودکار سرور:** `version-manifest.json` (جهت تشخیص خودکار نسخه توسط ایجنت‌ها)
+            * **چک‌سام SHA256:** `checksums.sha256`
+          files: |
+            build/*.zip
+            build/checksums.sha256
+            build/version-manifest.json

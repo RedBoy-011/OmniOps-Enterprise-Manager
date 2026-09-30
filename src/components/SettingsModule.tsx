@@ -68,7 +68,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({
   const [testingProxy, setTestingProxy] = useState(false);
 
   // GitHub state
-  const [repoUrl, setRepoUrl] = useState('https://github.com/omniops/omniops-enterprise');
+  const [repoUrl, setRepoUrl] = useState('https://github.com/RedBoy-011/OmniOps-Enterprise-Manager');
   const [gitStatus, setGitStatus] = useState('نسخه ۱.۱.۰ (پایدار و به‌روز)');
 
   const currentProvider = providersList.find((p) => p.id === selectedProviderId) || providersList[0];

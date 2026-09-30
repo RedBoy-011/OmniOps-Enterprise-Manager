@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="omniGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#4f46e5" />
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="url(#omniGrad)"/>
+  <!-- Omega Symbol -->
+  <path d="M 44 88 L 30 88 A 6 6 0 0 1 24 82 L 24 80 A 6 6 0 0 1 30 74 L 46 74 C 41 66 38 56 38 46 C 38 28 50 18 64 18 C 78 18 90 28 90 46 C 90 56 87 66 82 74 L 98 74 A 6 6 0 0 1 104 80 L 104 82 A 6 6 0 0 1 98 88 L 84 88 C 84 88 88 78 92 70 C 95 62 97 54 97 46 C 97 26 82 12 64 12 C 46 12 31 26 31 46 C 31 54 33 62 36 70 C 40 78 44 88 44 88 Z" fill="#ffffff" opacity="0.95"/>
+  <circle cx="98" cy="30" r="10" fill="#10b981" stroke="#ffffff" stroke-width="3"/>
+</svg>

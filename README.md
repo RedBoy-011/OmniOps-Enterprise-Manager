@@ -1,103 +1,87 @@
 # 🌐 OmniOps Enterprise Manager
 ### پلتفرم توزیع‌شده و هیبریدی مدیریت زیرساخت سرور، خوشه محاسباتی (Master + Worker Nodes) و پردازش هوشمند اسناد با هوش مصنوعی محلی (Zero-Token Edge Architecture)
 
+[![GitHub Repo](https://img.shields.io/badge/GitHub-RedBoy--011%2FOmniOps--Enterprise--Manager-181717.svg?logo=github)](https://github.com/RedBoy-011/OmniOps-Enterprise-Manager)
 [![Ubuntu](https://img.shields.io/badge/Ubuntu-22.04%20%7C%2024.04%20LTS-E95420.svg?logo=ubuntu)](https://ubuntu.com/)
+[![WireGuard](https://img.shields.io/badge/Network-Zero--Trust%20WireGuard-88171A.svg?logo=wireguard)](https://www.wireguard.com/)
+[![Caddy](https://img.shields.io/badge/SSL%20Engine-Caddy%20v2%20Auto--TLS-1f88c0.svg?logo=caddy)](https://caddyserver.com/)
+[![Python TUI](https://img.shields.io/badge/CLI-Python%20Rich%20TUI-3776AB.svg?logo=python)](https://github.com/Textualize/rich)
 [![Docker](https://img.shields.io/badge/Docker-Containers-blue.svg?logo=docker)](https://www.docker.com/)
 [![MCP Ready](https://img.shields.io/badge/MCP-Ready%20(4%20Servers)-0ea5e9.svg)](SYSTEM_RULES.md)
-[![Rules Gate](https://img.shields.io/badge/Rules%20Gate-SYSTEM__RULES.md-emerald.svg)](SYSTEM_RULES.md)
-[![Accessibility](https://img.shields.io/badge/Accessibility-WCAG%20AA-amber.svg)](docs/USER_MANUAL.md)
 [![Ollama](https://img.shields.io/badge/Ollama-Local%20LLM%20Engine-black.svg)](https://ollama.com/)
 [![AnythingLLM](https://img.shields.io/badge/AnythingLLM-Local%20RAG-orange.svg)](https://anythingllm.com/)
-[![Langflow](https://img.shields.io/badge/Langflow-Agent%20Pipelines-purple.svg)](https://www.langflow.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ---
 
 ## ⚡ دستورات نصب سریع تک‌خطی (Fast One-Line Installers)
 
-جهت استقرار فوری روی سیستم‌عامل **Ubuntu (20.04 / 22.04 / 24.04 LTS)** یا Debian، دستورات زیر را در ترمینال سرورهای خود اجرا فرمایید:
+کلیه فرامین نصب رسمی به مخزن سازمانی متصل بوده و جهت استقرار آنی روی سرورهای **Ubuntu (20.04 / 22.04 / 24.04 LTS)** و Debian بهینه‌سازی شده‌اند:
 
-### ۱. دستور نصب سریع سرور اصلی و پنل ادمین (Master Control-Plane):
-این دستور پیش‌نیازها، پایتون، داکر، هسته مرکزی و افزونه‌های محلی را راه‌اندازی کرده و پیش از نصب، **گزارش ارزیابی هوشمند سخت‌افزار و راهنمای ارتقا** را ارائه می‌دهد:
+### ۱. دستور نصب سریع سرور کنترل مرکزی (Master Control-Plane):
+این دستور ارزیابی بلادرنگ سخت‌افزار سرور را اجرا کرده، پیش‌نیازها، پایتون، داکر، شبکه امن مش، پایگاه‌داده و پنل ادمین را مستقر می‌نماید:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/install.sh | bash
 ```
 
-#### 👈 نصب سرور اصلی به همراه تعیین مستقیم نام کاربری و رمز عبور ادمین:
+#### 👈 نصب سرور اصلی با تعیین مستقیم نام کاربری، رمز عبور ادمین و پورت شبکه:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/install.sh | bash -s -- --role master --admin-user "admin" --admin-pass "OmniOps#2026!Sec"
+curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/install.sh | bash -s -- --role master --admin-user "admin" --admin-pass "OmniOps#2026!Sec" --web-port 9000 --enable-mesh
 ```
 
 ---
 
 ### ۲. دستور الحاق سرورهای دوم و سوم به عنوان نود محاسباتی (Worker Compute Nodes):
-جهت اضافه کردن سرورهای دارای کارت گرافیک یا RAM بالا برای میزبانی مدل‌های سنگین هوش مصنوعی (DeepSeek-R1, Dorna 2, Llama 3) بدون سنگین کردن پنل اصلی:
+جهت اختصاص سرورهای دارای کارت‌های گرافیک NVIDIA یا پردازنده‌های پرقدرت برای میزبانی مدل‌های زبانی سنگین (DeepSeek-R1, Dorna 2, Llama 3.3) و تضمین آپ‌تایم ۱۰۰٪ پنل مرکزی:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/install-worker.sh | bash -s -- --master "http://MASTER_SERVER_IP:9000" --token "omni-node-join-token" --name "Worker-Node-02"
+curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/install-worker.sh | bash -s -- --master "http://MASTER_SERVER_IP:9000" --token "omniops.v2.join-token-sec99" --name "Worker-Node-02"
 ```
 
-> **نکته معمار سیستم:** با اجرای اسکریپت ورکر، منابع سخت‌افزاری سرور دوم به صورت خودکار شناسایی شده و به استخر پردازشی پنل مرکزی متصل می‌گردند.
+> **نکته معمار سیستم:** با اجرای اسکریپت ورکر، منابع سخت‌افزاری سرور به صورت خودکار ممیزی شده و درایورهای GPU کشف و به استخر پردازشی متصل می‌گردند.
 
 ---
 
-### ۳. دستور نصب سرور لبه سبک و آینه گرافیکی (Lightweight Edge UI Mirror - Pasargad-Style):
-جهت راه‌اندازی پنل وب اختصاصی روی سرورهای سبک ۱ یا ۲ گیگابایت رم در دیتاسنتر یا شبکه CDN با صدور خودکار SSL و اتصال تونل امن به هسته بدون بار پردازشی:
+### ۳. دستور نصب سرور لبه، آینه گرافیکی و تونل امن (Lightweight Zero-Trust Edge UI Mirror):
+جهت راه‌اندازی درگاه وب سازمانی روی سرورهای سبک ابری (۱ یا ۲ گیگابایت رم) در دیتاسنتر یا شبکه CDN با **محیط تعاملی گرافیکی پایتون (Python TUI)**، برقراری خودکار **تونل رمزنگاری‌شده WireGuard** و صدور بومی **گواهی‌نامه SSL با Caddy**:
+
+#### 🚀 الف) حالت تعاملی گرافیکی (Interactive Python CLI - پیشنهادی):
+این فرمان محیط بصری ترمینال (بر پایه کتابخانه `rich`) را بوت کرده و پارامترهای اتصال را به صورت هوشمند و اعتبارسنجی‌شده دریافت می‌کند:
 
 ```bash
-# حالت تعاملی (پیشنهادی - پرسش مشخصات در ترمینال اوبونتو/دبیان)
-curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/install-edge-node.sh | bash
-
-# حالت خودکار مستقیم (با پارامترهای آدرس، پورت دلخواه، کلید تبادل و دامنه)
-curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/install-edge-node.sh | bash -s -- "185.190.22.45" "9000" "YOUR_SECURITY_TOKEN" "panel.mycompany-ai.ir"
+curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/install-edge-node.sh | bash
 ```
 
-> **فرآیند نصب تعاملی (Interactive Prompts) در ترمینال سرور سبک:**  
-> این اسکریپت روی سرورهای ابری سبک (Ubuntu 20.04/22.04/24.04 یا Debian 11/12 با رم ۱ یا ۲ گیگابایت) اجرا شده و ۴ سوال زیر را مطرح می‌نماید:  
-> ۱. **آدرس پابلیک سرور هسته مرکزی** (IP عمومی یا دامنه سرور پرقدرت اصلی)  
-> ۲. **پورت تبادل و ارتباط با هسته** (امکان وارد کردن هر **پورت دلخواه** مانند 9000، 8443، 8080، 4443 یا هر پورت آزاد ۱۰۲۴-۶۵۵۳۵)  
-> ۳. **کلید تبادل طولانی و اختصاصی (Security Token)** با قابلیت تولید خودکار توکن ۶۴ بایتی HMAC-SHA256 یا ورود کلید سفارشی  
-> ۴. **نام دامنه اینترنتی وب‌پنل** (مانند `panel.mycompany-ai.ir`)  
-> ۵. **پیکربندی خودکار SSL/TLS:** صدور آنی گواهی‌نامه Let's Encrypt TLS 1.3، ریدایرکت خودکار به HTTPS و فعال‌سازی تمدید ۹۰ روزه بدون دخالت دست.  
-> *مصرف کل حافظه RAM این سرور لبه کمتر از ۱۵۰ مگابایت بوده و کلیه پردازش‌های سنگین در سرور هسته قدرتمند انجام می‌گردد.*
+#### ⚡ ب) حالت خودکار مستقیم (Unattended / Silent Execution):
+```bash
+curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/install-edge-node.sh | bash -s -- --core "185.190.22.45" --port 9000 --token "YOUR_STRUCTURED_EXCHANGE_TOKEN" --domain "panel.mycompany-ai.ir" --auto-ssl
+```
 
 ---
 
-### ۴. تب جدید نصب و تولید اسکریپت شل در پنل ادمین (New 'Installation' Tab):
-در ماژول مدیریت زیرساخت سرور، یک تب اختصاصی به نام **«نصب خودکار لبه» (Installation Tab)** اضافه شده است که به مدیران سیستم امکان می‌دهد:
-- پورت ارتباطی دلخواه را تنظیم یا از میان پریست‌های متداول (9000, 8443, 8080, 4443, 9443) انتخاب نمایند.
-- کلیدهای تبادل با انتروپی بالا (توکن قوی ۶۴ بایت یا فشرده ۳۲ بایت) را با یک کلیک بسازند یا بچرخانند (Rotate).
-- اسکریپت کامل شل با کدهای بازبینی‌شده را دانلود (`install-edge-node.sh`) یا کپی کنند.
-- از **شبیه‌ساز زنده تعاملی ترمینال اوبونتو** داخل پنل استفاده کنند و مراحل نصب را پیش از اجرا در سرور واقعی تست نمایند.
+## 🛡️ نوآوری‌های کلیدی معماری لبه و امنیت Zero-Trust
+
+### ۱. محیط تعاملی نصب با Python CLI (به جای Bash ساده):
+اسکریپت بوت‌استرپ `install-edge-node.sh` بدون نیاز به دخالت کاربر، محیط اجرایی پایتون ۳ را آماده کرده و یک رابط کاربری ترمینالی پیشرفته (TUI) با جعبه‌های رنگی، انیمیشن اسپینر، جدول خلاصه مشخصات و اعتبارسنجی بلادرنگ فیلدها اجرا می‌کند:
+1. **دریافت IP و پورت مستر:** دریافت آدرس سرور اصلی و امکان تعریف پورت دلخواه (مانند 9000, 8443, 8080).
+2. **دریافت توکن ساختاریافته (Structured Token):** اعتبارسنجی ساختار کلید تبادل و تجزیه خودکار اطلاعات کلاستر.
+3. **گزینش متدولوژی SSL:** امکان انتخاب بین صدور خودکار ACME توسط Caddy یا مشخص‌سازی مسیر فایل‌های اختصاصی گواهی (`.crt` و `.key`).
+
+### ۲. مکانیزم کلید تبادل امن و شبکه Zero-Trust با WireGuard:
+- **توکن ساختاریافته هوشمند (Kubernetes-Style Token):** سیستم به جای رشته‌های متنی ساده از توکن‌های ساختاریافته دارای امضای دیجیتال (مانند `omniops.v2.<cluster_id>.<endpoint_payload>.<signature>`) استفاده می‌کند.
+- **ارتباط همتا-به-همتا با WireGuard:** پس از ورود توکن در سرور لبه، اسکریپت جفت‌کلید رمزنگاری (`PrivateKey` و `PublicKey`) را ایجاد کرده و یک تونل ارتباطی ایزوله (`10.88.0.2 ⟷ 10.88.0.1`) می‌سازد.
+- **مسدودسازی پورت‌های اینترنتی:** سرور مستر هیچ درگاه ناامنی روی وب ندارد؛ تمام داده‌ها منحصراً از بستر تونل رمزنگاری‌شده WireGuard مخابره می‌شوند.
+
+### ۳. مدیریت خودکار SSL با Caddy Engine در لبه:
+- برخلاف پیچیدگی‌ها و ریسک‌های کران‌جاب Certbot در Nginx، سرور لبه از وب‌سرور مدرن **Caddy v2** با قابلیت **Zero-Config Automatic HTTPS** بهره می‌برد.
+- به محض معرفی نام دامنه سازمانی، پروتکل ACME فعال شده، گواهی‌نامه رسمی Let's Encrypt / ZeroSSL صادر و هر ۹۰ روز بدون دخالت ادمین تمدید می‌گردد.
+- ترافیک کاربران از پورت ۴۴۳ دریافت و از بستر تونل WireGuard به کنترل‌پنل مستر هدایت می‌شود.
+- **مصرف حافظه رم سرور لبه:** کمتر از ۱۵۰ مگابایت (ایزوله کامل از پردازش‌های سنگین هوش مصنوعی).
 
 ---
 
-## 📚 کتابچه راهنمای جامع و مستندات عملیاتی (Documentation & User Manual)
-
-کتابچه‌های راهنمای تفصیلی معماری، ابزارهای شبکه، عیب‌یابی و فرآیندها در مسیرهای زیر در دسترس است:
-- 📜 [مانیفست دکترینال و سند بالادستی قوانین ایجنت مهندسی (SYSTEM_RULES.md)](SYSTEM_RULES.md)
-- 📘 [کتابچه راهنمای جامع کاربران و راهنمای عملیاتی هسته (Comprehensive User Manual)](docs/USER_MANUAL.md)
-- 📖 [کتابچه راهنمای ابزارهای هسته و سناریوهای شبکه (Core Operations Handbook)](docs/HANDBOOK.md)
-- 🔌 [راهنمای افزونه و بازوی اجرایی کروم (Chrome Extension Guide)](chrome_extension/INSTALL_GUIDE.md)
-
----
-
-## 📖 معرفی سامانه (Overview & Vision)
-
-**OmniOps Enterprise** یک سیستم‌عامل ابری و پنل عملیاتی مدرن برای سازمان‌ها، تیم‌های دواپس (DevOps)، مدیران زیرساخت شبکه و کاربران اداری است که برای نخستین بار **معماری توزیع‌شده هیبریدی (Master Control-Plane + Worker Nodes)** را همراه با **استنتاج محلی بدون اینترنت (Local-First Zero-Token)** پیاده‌سازی نموده است.
-
-در این سامانه:
-1. **معماری تفکیک‌شده و ضد کراش (Resilient Control-Plane):** پنل اصلی ادمین روی سرور سبک مستر اجرا می‌شود و پردازش مدل‌های سنگین زبانی به سرورهای عملیاتی (Worker Nodes) سپرده می‌شود؛ بدین ترتیب حتی در شدیدترین بحران‌های حافظه (OOM)، پنل ادمین ۱۰۰٪ آنلاین و بدون قطعی باقی می‌ماند.
-2. **ارزیابی هوشمند سخت‌افزار در شروع نصب:** اسکریپت نصب در ثانیه اول مشخصات RAM, CPU, GPU, Disk را تحلیل کرده و گزارش ارزیابی آمادگی سخت‌افزاری و راهنمای ارتقا ارائه می‌دهد.
-3. **پایش دایره‌ای لحظه‌ای سلامت نودها (Cluster Health Donut Dashboard):** نمایش بصری درصد استفاده از RAM و پردازنده کلیه نودها با نمودارهای دایره‌ای هم‌مرکز و تله‌متری زنده.
-4. **حافظه ماندگار و پایدار چت‌بات هسته (Persistent Chat Memory):** تاریخچه کامل پرسش و پاسخ‌ها، وضعیت متغیرهای محیطی و تصمیمات کلیدی حتی پس از ریلود یا قطعی موقت سرویس پایدار می‌ماند.
-5. **پشتیبانی کامل از مدل‌های ملی و بومی ایرانی:** اجرای آفلاین و محلی مدل‌های ملی نظیر **Dorna 2:8b** و **Maral 7B** روی موتور اولاما بدون نیاز به اینترنت.
-6. **اسناد اداری و محرمانه بدون توکن (Zero-Token RAG):** تحلیل محلی فایل‌های PDF, Word, Excel, CSV توسط موتورهای **AnythingLLM** و **JEV Reader** با هزینه صفر توکن.
-
----
-
-## 🏗️ دیاگرام معماری توزیع‌شده کلاستر (Distributed Cluster & Edge Bridge Architecture)
+## 🏗️ دیاگرام معماری توزیع‌شده کلاستر و مش امنیتی (Distributed Architecture)
 
 ```text
                   +-------------------------------------------------------+
@@ -107,26 +91,28 @@ curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/instal
                                      (HTTPS / TLS 1.3 - پورت 443)
                                               v
    ===================================================================================
-   [ سرور لبه: آینه گرافیکی و پل پروکسی سبک ]  EDGE UI MIRROR NODE (1-2GB RAM VPS)
-   - میزبانی رابط کاربری وب، Nginx/Caddy و صدور خودکار SSL با Let's Encrypt
-   - دریافت کلید تبادل امن (HMAC-SHA256 Secret Token) و هندشیک با هسته
-   - مصرف حافظه: کمتر از ۱۵۰ مگابایت | ایزوله کامل از مدل‌های سنگین هوش مصنوعی
+   [ سرور لبه: آینه گرافیکی و درگاه معکوس سبک ]  EDGE UI MIRROR NODE (1-2GB RAM VPS)
+   - وب‌سرور Caddy v2: صدور و تمدید خودکار بومی SSL (ACME Protocol TLS 1.3)
+   - رابط گرافیکی Python Rich TUI برای استقرار و عیب‌یابی در ترمینال لینوکس
+   - جفت‌کلید WireGuard Client: اینترفیس wg0 (IP مجازی: 10.88.0.2/24)
+   - مصرف حافظه: < 150 MB RAM | ایزوله کامل از مدل‌های زبانی سنگین
    ===================================================================================
                                               |
-                     (تونل امن رمزنگاری‌شده دوطرفه WSS / TLS 1.3 Relay)
+                   (تونل رمزنگاری‌شده نقطه-به-نقطه Zero-Trust WireGuard)
+                     [ UDP 51820 Peer-to-Peer Tunnel / رنج 10.88.0.0/24 ]
                                               v
    ===================================================================================
-   [ سرور اول: پنل کنترل و هسته مرکزی ]  MASTER CONTROL-PLANE NODE (:9000 / :8888)
-   - ارکستراسیون کلان، OmniRoute Intelligent Mesh Router و پایگاه‌داده
-   - اجرای فرامین روت شل، احراز هویت سه سطحی (SuperAdmin / Admin / User)
-   - پایش تله‌متری سلامت نودها و مدیریت حافظه پایدار چت‌بات (Memory Bank)
+   [ سرور اول: پنل کنترل و هسته مرکزی ]  MASTER CONTROL-PLANE NODE (10.88.0.1:9000)
+   - ارکستراسیون کلان، OmniRoute Intelligent Router و پایگاه‌داده
+   - تولید و مدیریت توکن‌های ساختاریافته الحاق (Structured Join Tokens)
+   - اجرای فرامین روت شل و پایش تله‌متری سلامت گره‌ها
    ===================================================================================
                                               |
-                          (شبکه امن داخلی / WireGuard Mesh)
+                           (شبکه امن داخلی / WireGuard Overlay Mesh)
                                               |
-             +--------------------------------+--------------------------------+
-             |                                                                 |
-             v                                                                 v
+              +--------------------------------+--------------------------------+
+              |                                                                 |
+              v                                                                 v
 ===========================================       ===========================================
 [ سرور دوم: نود پردازش سنگین ]                    [ سرور سوم: نود وکتور و پایپ‌لاین ]
 WORKER COMPUTE NODE 01 (GPU Dedicated)            WORKER COMPUTE NODE 02 (CPU/RAG Dedicated)
@@ -145,10 +131,10 @@ WORKER COMPUTE NODE 01 (GPU Dedicated)            WORKER COMPUTE NODE 02 (CPU/RA
 
 ### ۱. داشبورد دایره‌ای پایش سلامت نودها (Cluster Health Donut Dashboard)
 - **نمودارهای هم‌مرکز دوگانه (Dual Concentric Donut Rings):**
-  - **حلقه خارجی:** پایش لحظه‌ای درصد مصرف حافظه RAM با تغییر رنگ پویا (فیروزه‌ای، کهربایی، قرمز بحرانی).
-  - **حلقه داخلی:** پایش درصد بار پردازشی هسته‌های CPU (بنفش/صورتی).
-  - **مرکز دایره:** شاخص سلامت، تاخیر پینگ و مدل‌های لودشده روی هر سرور نود.
-- **تله‌متری زنده (Live Telemetry Streaming):** پایش پیوسته با نشانگر پالس‌دار آنلاین و نوسان سنسورهای واقعی.
+  - **حلقه خارجی:** پایش لحظه‌ای درصد مصرف حافظه RAM با کد رنگی هوشمند (فیروزه‌ای، کهربایی، قرمز بحرانی).
+  - **حلقه داخلی:** پایش درصد بار پردازشی هسته‌های CPU.
+  - **مرکز دایره:** شاخص سلامت، وضعیت تونل WireGuard، تاخیر پینگ و مدل‌های لودشده.
+- **تله‌متری زنده (Live Telemetry Streaming):** پایش پیوسته با نشانگر پالس‌دار آنلاین و نوسان سنسورهای فیزیکی سرورها.
 - **نمای تجمیعی کل استخر کلاستر:** نمایش مجموع کل RAM کلاستر (مثلاً ۱۱۲ گیگابایت)، کل هسته‌ها (۵۶ هسته) و کارت‌های گرافیک فعال (۲۴GB VRAM).
 
 ### ۲. گزارش ارزیابی هوشمند سخت‌افزار سرور (Hardware Assessment & Upgrade Advisor)
@@ -165,57 +151,41 @@ WORKER COMPUTE NODE 01 (GPU Dedicated)            WORKER COMPUTE NODE 02 (CPU/RA
 - **ثبت متغیرهای محیطی:** نگهداری اسنپ‌شات از مقادیر متغیرها در هر پاسخ.
 
 ### ۴. چت‌روم چندمنظوره با دسترسی به مدل‌های ابری و محلی
-- تعویض تک‌سطری و روان مدل جاری با لیست کشویی هوشمند.
-- فیلتر خودکار مدل‌های آنلاین با نمایش نام رسمی مدل (`ollama/dorna2:8b`, `deepseek/deepseek-chat`, `gemini-2.5-flash`).
-- امکان تغییر عنوان چت با آیکون مداد یا دابل کلیک.
+- رتبه‌بندی پویای مدل‌های فعال بر اساس تاخیر، دسترسی API و سرعت.
+- پشتیبانی کامل از مدل‌های ملی ایرانی نظیر **Dorna 2:8b** و **Maral 7B** روی موتور اولاما بدون نیاز به اینترنت.
+- سوئیچ روان میان مدل‌های داخلی محلی، سرورهای ورکر و APIهای ابری.
 
 ### ۵. موتورهای پردازش محلی اسناد اداری و محرمانگی داده‌ها
 - **AnythingLLM (:3001):** پایگاه دانش اسناد محلی با دیتابیس برداری بر پایه وکتورهای BGE-M3.
 - **JEV Reader (:8000):** خرد کردن هوشمند متون (Chunking 512)، OCR اسناد اسکن‌شده و ریرنکینگ محلی.
-- **تضمین هزینه صفر توکن (Zero-Token Guarantee):** عدم ارسال مکاتبات سازمانی به بیرون از شبکه.
-
-### ۶. زمان‌بندی هوشمند وظایف شبانه در ساعات خلوتی (Intelligent Off-Peak Scheduler)
-- برنامه‌ریزی دانلود خودکار مدل‌های سنگین هوش مصنوعی (DeepSeek-R1 و Llama 3) در ساعات ۲ تا ۵ بامداد جهت عدم اشغال پهنای باند کاری سازمان.
-- ریاستارت دوره‌ای و خودکار سرویس‌ها (Langflow و Ollama) در ساعات غیراداری جهت تخلیه بافرهای VRAM/RAM و جلوگیری از نشتی حافظه.
-
-### ۷. کنسول روت شل امن و لاگ‌های معماری (Secure Root Shell & Lifecycle Audit)
-- ترمینال تعاملی جهت اجرای فرامین مجاز اوبونتو و مدیریت داکر با تفکیک دسترسی SuperAdmin.
-- بافر FIFO مستقل جهت ثبت متادیتا و لاگ‌های چرخه حیات کلاستر با قابلیت خروجی استاندارد لاگ متنی (.log).
-
-### ۸. کتابچه جامع راهنمای عملیاتی و دانلود ۱-کلیکه (In-App Operations Handbook)
-- امکان مشاهده کامل کتابچه راهنمای عملیاتی هسته در مودال تعاملی داخل پنل یا دانلود مستقیم فایل متنی Markdown از هدر داشبورد.
-
-### ۹. پروتکل کانتکست مدل (MCP Hub) و مهارت‌های تخصصی ایجنت (Agentic Engineering Loop)
-- **پایپ‌لاین ۳ مرحله‌ای ایجنت مهندسی:** چرخه بسته **دسترسی (MCP) ⟷ راهنما (Skills) ⟷ گیت محدودیت (Rules Gate)**.
-- **۴ سرور استاندارد MCP با ۱۸ ابزار سیستمی:**
-  - `git-mcp-server`: ابزارهای `git_diff`، `git_status`، `git_log` و `git_commit_gate`.
-  - `terminal-exec-server`: ابزارهای امن اجرای تست‌ها (`run_tests`)، `exec_lint` و `typecheck_project`.
-  - `filesystem-mcp-server`: ابزارهای `read_changed_file` و `apply_code_patch`.
-  - `github-mcp-server`: دروازه ممیزی پول‌ریکوئست‌ها و مسدودسازی خودکار مرج‌های فاقد استاندارد.
-- **مهارت‌های تخصصی مهندسی:** `#LintAndTest`، `#AutoTest`، `#DocGen` و `#QualityGate`.
-- **گیت قوانین دکترینال (Doctrinal Rules Gate):** مسدودسازی فوری کامیت در صورت نقض خط‌مشی‌های امنیتی نظیر افشای توکن (`RULE-SEC-01`) و تولید پچ اصلاحی خودکار (Auto-Fix Diff).
-- **نوار ابزار هوشمند چت‌روم مرکزی (Agentic Engineering Bar):** پایش زنده وضعیت سرورهای MCP، قوانین فعال، و اجرای فرامین ارزیابی با یک کلیک در محیط چت.
-
-### ۱۰. پوسته و دسترسی‌پذیری (Theme Toggle & Accessibility - WCAG AA)
-- **تم تیره کنتراست بالا (High-Contrast Dark):** با پس‌زمینه عمیق، هایلایت‌های نئونی، و کاهش خستگی چشم در شیفت‌های طولانی مانیتورینگ.
-- **تم روشن و خوانا (Neutral Light - WCAG AA):** بهینه‌سازی شده با رنگ‌های خنثی و کنتراست ارتقایافته جهت استفاده در محیط‌های پرنور اداری.
-- **سوئیچ سریع (Sun / Moon):** دسترسی آنی از نوار بالایی سامانه و تب تنظیمات، با ذخیره‌سازی محلی در مرورگر (`localStorage`).
+- **تضمین هزینه صفر توکن (Zero-Token Guarantee):** عدم ارسال مکاتبات و داده‌های سازمانی به خارج از شبکه.
 
 ---
 
-## 🌐 جدول پورت‌ها، سرویس‌ها و شبکه‌بندی (Network & Service Mesh)
+## 🌐 جدول پورت‌ها، سرویس‌ها و شبکه‌بندی امن (Network & Ports Matrix)
 
-| نام سرویس | پورت پیش‌فرض | نقش در سامانه | حالت دسترسی |
+| نام سرویس | پورت پیش‌فرض | نقش در سامانه | پروتکل و لایه امنیتی |
 | :--- | :--- | :--- | :--- |
-| **OmniOps Core Hub** | `9000` / `8080` | ارکستراتور مرکزی، احراز هویت RBAC و وب‌پنل | عمومی / مدیریت شبکه |
-| **MCP Git Daemon** | `local://mcp-git` | پروتکل کانتکست مدل: بازرسی شاخه‌ها و `git_diff` | امن داخلی / درون‌پروسسی |
-| **MCP Terminal Daemon** | `local://mcp-term`| اجرای امن linter و کامپایلر تایپ‌اسکریپت | امن داخلی / سندباکس |
-| **JEV Fast Reader** | `8000` | موتور خواندن، OCR، تکه‌بندی و ریرنکینگ اسناد | شبکه امن `omniops_mesh` |
-| **AnythingLLM Engine** | `3001` | پایگاه دانش اسناد محلی و پایپ‌لاین بدون توکن RAG | شبکه امن `omniops_mesh` |
-| **Ollama Local LLM** | `11434` | موتور استنتاج مدل‌های متنی، استدلال و کدنویسی | شبکه امن داخلی |
+| **Edge UI Gateway** | `443` / `80` | درگاه امن وب و پروکسی معکوس | HTTPS / Caddy TLS 1.3 Auto-ACME |
+| **WireGuard Mesh** | `51820/udp` | تونل رمزنگاری‌شده همتا-به-همتا | ChaCha20-Poly1305 Zero-Trust Tunnel |
+| **OmniOps Control-Plane** | `9000` / `8080` | هسته مرکزی، احراز هویت و API | شبکه اختصاصی `10.88.0.1` (ایزوله از وب) |
+| **MCP Git Daemon** | `local://mcp-git` | بازرسی شاخه‌ها و `git_diff` | درون‌پروسسی / IPC امن |
+| **MCP Terminal Daemon** | `local://mcp-term`| اجرای امن linter و آزمون‌های کد | سندباکس ایزوله لینوکس |
+| **JEV Fast Reader** | `8000` | موتور خواندن، OCR و ریرنکینگ | شبکه امن `omniops_mesh` |
+| **AnythingLLM Engine** | `3001` | پایگاه دانش اسناد محلی RAG | شبکه امن `omniops_mesh` |
+| **Ollama Local LLM** | `11434` | استنتاج مدل‌های متنی، استدلال و کد | شبکه امن داخلی ورکرها |
 | **Langflow Visual Studio** | `7860` | طراحی گراف بصری خطوط لوله ایجنت‌ها | شبکه امن `omniops_mesh` |
-| **n8n Workflow Engine** | `5678` | اتوماسیون وب‌هوک‌ها، تلگرام، پیامک و دیتابیس‌ها | شبکه امن `omniops_mesh` |
-| **WireGuard / Overlay** | `51820/udp` | مش امن بین‌سروری برای اتصال Master به Workerها | داخلی / P2P Mesh |
+| **n8n Workflow Engine** | `5678` | اتوماسیون وب‌هوک‌ها و پایگاه‌های داده | شبکه امن `omniops_mesh` |
+
+---
+
+## 📚 کتابچه راهنمای جامع و مستندات عملیاتی (Documentation & User Manual)
+
+کتابچه‌های راهنمای تفصیلی معماری، ابزارهای شبکه، عیب‌یابی و فرآیندها در مسیرهای زیر در دسترس است:
+- 📜 [مانیفست دکترینال و سند بالادستی قوانین ایجنت مهندسی (SYSTEM_RULES.md)](SYSTEM_RULES.md)
+- 📘 [کتابچه راهنمای جامع کاربران و راهنمای عملیاتی هسته (Comprehensive User Manual)](docs/USER_MANUAL.md)
+- 📖 [کتابچه راهنمای ابزارهای هسته و سناریوهای شبکه (Core Operations Handbook)](docs/HANDBOOK.md)
+- 🔌 [راهنمای افزونه و بازوی اجرایی کروم (Chrome Extension Guide)](chrome_extension/INSTALL_GUIDE.md)
 
 ---
 
@@ -231,11 +201,11 @@ docker compose -f deployment/docker-compose.local.yml up -d
 
 ## 🔒 امنیت، محرمانگی و ایزولاسیون سازمانی
 - کلیه کانتینرهای ماژولار درون شبکه داکر Bridge ایزوله به نام `omniops_mesh` (رنج `172.28.0.0/16`) ارتباط برقرار می‌کنند.
-- ارتباط سرور مستر با نودهای ورکر از طریق تونل رمزنگاری‌شده و بدون نیاز به پورت عمومی ناامن انجام می‌شود.
-- تفکیک کامل مجوزهای سیستم بر اساس رول‌های `SuperAdmin`, `Admin`, `User`.
+- ارتباط سرور مستر با نودهای لبه و ورکر منحصراً از طریق تونل رمزنگاری‌شده WireGuard (`10.88.0.0/24`) صورت می‌پذیرد.
+- احراز هویت سه سطحی مبتنی بر نقش (`SuperAdmin`, `Admin`, `User`) با تفکیک وظایف و ثبت کلیه لاگ‌های چرخه حیات.
 
 ---
 
 ## 📄 لایسنس
-این سامانه تحت پروانه متن‌باز [MIT License](LICENSE) منتشر شده است.  
-توسعه‌یافته با استانداردهای مهندسی سیستم‌های توزیع‌شده و پردازش مرزی هوش مصنوعی (Edge AI).
+این سامانه تحت پروانه متن‌باز [MIT License](LICENSE) در مخزن [RedBoy-011/OmniOps-Enterprise-Manager](https://github.com/RedBoy-011/OmniOps-Enterprise-Manager) منتشر شده است.  
+طراحی و پیاده‌سازی‌شده با استانداردهای مدرن DevOps، شبکه‌های Zero-Trust و استنتاج مرزی هوش مصنوعی.

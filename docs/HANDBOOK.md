@@ -19,6 +19,7 @@
    - [پایپ‌لاین ایجنت مهندسی و پروتکل کانتکست مدل (MCP)](#۴۷-پایپلاین-ایجنت-مهندسی-و-پروتکل-کانتکست-مدل-mcp)
    - [گیت قوانین دکترینال و مانیفست SYSTEM_RULES.md](#۴۸-گیت-قوانین-دکترینال-و-مانیفست-system_rulesmd)
    - [پوسته و دسترسی‌پذیری سازمانی (Theme & Accessibility)](#۴۹-پوسته-و-دسترسیپذیری-سازمانی)
+   - [نمای توپولوژی شبکه و گراف اتصالات D3.js (Network Topology Overview)](#۴۱۰-نمای-توپولوژی-شبکه-و-گراف-اتصالات-d3js)
 5. [شبکه‌بندی امن، پورت‌ها و معماری Zero-Trust](#۵-شبکهبندی-امن-پورتها-و-معماری-zero-trust)
 6. [دستورات متداول مدیریتی و عیب‌یابی سریع](#۶-دستورات-متداول-مدیریتی-و-عیبیابی-سریع)
 
@@ -40,7 +41,7 @@
 روی سرور مرکزی لینوکس (اوبونتو ۲۲.۰۴ یا ۲۴.۰۴):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/install.sh | bash -s -- --role master --admin-user "admin" --admin-pass "OmniOps#2026!Sec"
+curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/install.sh | bash -s -- --role master --admin-user "admin" --admin-pass "OmniOps#2026!Sec"
 ```
 
 این اسکریپت مراحل زیر را به صورت خودکار انجام می‌دهد:
@@ -54,7 +55,7 @@ curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/instal
 روی هر سرور کمکی دوم یا سوم:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/install-worker.sh | bash -s -- --master "http://IP_OF_MASTER:9000" --token "omni-node-join-token" --name "Worker-Node-02"
+curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/install-worker.sh | bash -s -- --master "http://IP_OF_MASTER:9000" --token "omni-node-join-token" --name "Worker-Node-02"
 ```
 
 این اسکریپت:
@@ -132,6 +133,16 @@ curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/instal
 - **تم تیره کنتراست بالا (High-Contrast Dark):** با زمینه عمیق شیشه‌ای، هایلایت‌های نئونی، و کاهش خستگی چشم در شیفت‌های شبانه.
 - **تم روشن خنثی (Neutral Light):** با رنگ‌های پس‌زمینه آرام و کنتراست متنی شفاف جهت استفاده در ساعات روز.
 - **دکمه سوئیچ سریع (Sun / Moon):** در نوار هدر اصلی و ماژول تنظیمات با ذخیره‌سازی پایدار در حافظه مرورگر (`localStorage`).
+
+### ۴.۱۰. نمای توپولوژی شبکه و گراف اتصالات D3.js (Network Topology Overview)
+- **موتور گراف پویا با D3.js Force-Directed:** تصویربرداری زنده و بلادرنگ از ساختار نودهای کلاستر و توپولوژی مش با محاسبات فیزیک گرانشی، دافعه بارهای الکتریکی و ممانعت از هم‌پوشانی.
+- **نودهای فعال تحت پایش (Active Monitored Nodes):**
+  - **Core Hub (:9000):** مستر کنترل‌پلین و ارکستراتور مرکزی.
+  - **Ollama Engine (:11434):** موتور استنتاج محلی مدل‌های زبانی متن‌باز و بومی.
+  - **n8n Automation (:5678):** اتوماسیون جریان‌های کاری، ارسال رویدادها و وب‌هوک‌ها.
+  - **Dify Platform (:8080):** پلتفرم ایجنت‌های سازمانی و پایپ‌لاین‌های چندعاملی.
+  - **AnythingLLM (:3001) & JEV Reader (:8000):** پایگاه دانش محلی RAG و موتور OCR و پیش‌پردازش.
+- **پایش لحظه‌ای تاخیر و سلامت (Real-time Telemetry):** جریان بسته‌های داده به صورت ذرات نئونی متحرک در مسیر لینک‌ها، همراه با مانیتورینگ تاخیر میلی‌ثانیه‌ای (RTT)، نرخ فریم بسته‌ها و مصرف CPU/RAM با قابلیت بازرسی در Inspector کناری.
 
 ---
 

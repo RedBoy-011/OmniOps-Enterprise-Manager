@@ -193,6 +193,33 @@ export interface OmniRouteInfo {
   routing_reason?: string;
 }
 
+export interface AgentCommandStep {
+  stepNumber: number;
+  title: string;
+  command: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+  output?: string;
+}
+
+export interface AgentCommandProposal {
+  id: string;
+  intentSummary: string; // تفسیر قصد و نوع درخواست
+  reasoning: string; // افکار و منطق ایجنت هوشمند
+  targetSystem: 'windows' | 'cisco' | 'linux' | 'mikrotik' | 'browser' | 'security' | 'general';
+  toolId: string;
+  toolName: string;
+  executionArm: string;
+  command: string;
+  steps: AgentCommandStep[];
+  status: 'pending_approval' | 'approved_full' | 'approved_step' | 'rejected' | 'completed' | 'permission_denied';
+  requiresRbacCheck: boolean;
+  isRbacSatisfied?: boolean;
+  rbacDeniedReason?: string;
+  finalResultSummary?: string;
+  approvedMode?: 'full' | 'step';
+  currentStepIndex?: number;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
@@ -204,6 +231,7 @@ export interface ChatMessage {
   server_actions?: ServerCommandAction[];
   generated_media?: GeneratedMediaItem[];
   tool_execution?: ToolExecutionAction;
+  command_proposal?: AgentCommandProposal;
   document_analysis?: DocumentAnalysisResult;
   is_tool_command?: boolean;
   is_command_mode?: boolean;

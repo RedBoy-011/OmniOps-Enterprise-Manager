@@ -119,7 +119,7 @@ export const DEFAULT_MCP_SERVERS: McpServerConfig[] = [
     id: 'mcp-github',
     name: 'GitHub Enterprise PR Gateway',
     transport: 'sse',
-    command: 'github-mcp-gateway --org=omniops-enterprise',
+    command: 'github-mcp-gateway --org=RedBoy-011',
     endpoint: 'https://api.github.com/mcp-sse',
     status: 'connected',
     toolsCount: 5,

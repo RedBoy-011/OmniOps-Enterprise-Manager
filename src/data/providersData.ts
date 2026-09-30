@@ -132,6 +132,16 @@ export const DEFAULT_PROVIDERS: ApiProviderConfig[] = [
     category: 'local'
   },
   {
+    id: 'ember',
+    name: 'ember',
+    displayName: 'Ember-1 (Agentic Internal Engine & Vision)',
+    officialKeyUrl: 'https://omniops.internal/models/ember-1',
+    defaultBaseUrl: 'http://localhost:8443/v1/ember',
+    requiresKey: false,
+    description: 'مدل تخصصی عامل‌محور داخلی برای Tool Calling آنی، کدنویسی سبک، تحلیل بصری (Vision) و پایپ‌لاین‌های اتوماسیون با حداقل تأخیر',
+    category: 'local'
+  },
+  {
     id: 'lmstudio',
     name: 'lmstudio',
     displayName: 'LM Studio / LocalAI / vLLM',

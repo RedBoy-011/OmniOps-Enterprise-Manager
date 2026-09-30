@@ -9,6 +9,8 @@ import {
   SystemLogEntry
 } from '../types';
 import { ClusterHealthDonutDashboard } from './ClusterHealthDonutDashboard';
+import { NetworkTopologyOverview } from './NetworkTopologyOverview';
+import { MultiAgentTopologyDashboard } from './MultiAgentTopologyDashboard';
 import { 
   Terminal, 
   Play, 
@@ -64,8 +66,10 @@ import {
   Save,
   Share2,
   SlidersHorizontal,
-  Gauge
+  Gauge,
+  GitBranch
 } from 'lucide-react';
+import { DEFAULT_PROJECT_RULES, DEFAULT_MCP_SERVERS, generateDoctrinalRulesMarkdown } from '../data/rulesAndMcpData';
 
 interface LocalModelItem {
   id: string;
@@ -695,8 +699,78 @@ export const ServerManagementModule: React.FC<ServerManagementModuleProps> = ({
   onClearSystemLogs: propOnClearSystemLogs,
   onAddSystemLog: propOnAddSystemLog
 }) => {
-  // Sub-tabs: 'local_stack', 'cluster_nodes', 'edge_gateway', 'installation', 'console', 'scheduler', 'core_memory', or 'architecture_logs'
-  const [activeSubTab, setActiveSubTab] = useState<'local_stack' | 'cluster_nodes' | 'edge_gateway' | 'installation' | 'console' | 'architecture_logs' | 'scheduler' | 'core_memory'>('local_stack');
+  // Sub-tabs: 'multi_agent_topology', 'local_stack', 'network_topology', 'cluster_nodes', 'edge_gateway', 'installation', 'console', 'scheduler', 'core_memory', 'mcp_pipeline', or 'architecture_logs'
+  const [activeSubTab, setActiveSubTab] = useState<'multi_agent_topology' | 'local_stack' | 'network_topology' | 'cluster_nodes' | 'edge_gateway' | 'installation' | 'console' | 'architecture_logs' | 'scheduler' | 'core_memory' | 'mcp_pipeline'>('multi_agent_topology');
+
+  // MCP Protocol & Rules Engine Pipeline State (Technical Management as requested by user)
+  const [mcpServersState] = useState(DEFAULT_MCP_SERVERS);
+  const [projectRulesState] = useState(DEFAULT_PROJECT_RULES);
+  const [mcpAuditRunnerState, setMcpAuditRunnerState] = useState<'idle' | 'running_lint' | 'running_rules' | 'running_autotest'>('idle');
+  const [mcpAuditProgress, setMcpAuditProgress] = useState<number>(0);
+  const [mcpAuditLogs, setMcpAuditLogs] = useState<string[]>([]);
+  const [mcpSelectedRuleId, setMcpSelectedRuleId] = useState<string | null>(null);
+  const [mcpCopiedRulesMd, setMcpCopiedRulesMd] = useState<boolean>(false);
+  const [mcpFilterCategory, setMcpFilterCategory] = useState<'all' | 'security' | 'architecture' | 'code_style' | 'testing' | 'git_commit'>('all');
+  const [mcpSearchTerm, setMcpSearchTerm] = useState<string>('');
+
+  const handleRunMcpAudit = (auditType: 'all' | 'lint' | 'rules' | 'autotest') => {
+    if (mcpAuditRunnerState !== 'idle') return;
+    
+    setMcpAuditRunnerState(auditType === 'lint' ? 'running_lint' : auditType === 'rules' ? 'running_rules' : 'running_autotest');
+    setMcpAuditProgress(15);
+    setMcpAuditLogs([
+      `[${new Date().toLocaleTimeString('fa-IR')}] 🚀 آغاز چرخه پایش فنی پروتکل MCP و گیت قوانین دکترینال...`,
+      `[${new Date().toLocaleTimeString('fa-IR')}] 🔍 فراخوانی سرورهای MCP: اتصال به mcp-git (StdIO) و استخراج git_diff...`
+    ]);
+
+    setTimeout(() => {
+      setMcpAuditProgress(45);
+      setMcpAuditLogs(prev => [
+        ...prev,
+        `[${new Date().toLocaleTimeString('fa-IR')}] 📦 دریافت فایل‌های مرحله‌بندی‌شده: ۰ خطای سینتکسی یافت شد.`,
+        `[${new Date().toLocaleTimeString('fa-IR')}] ⚡ اجرای ابزار #LintAndTest: تست‌های واحد Vitest و تایپ‌اسکریپت Strict بررسی شدند.`
+      ]);
+    }, 800);
+
+    setTimeout(() => {
+      setMcpAuditProgress(80);
+      setMcpAuditLogs(prev => [
+        ...prev,
+        `[${new Date().toLocaleTimeString('fa-IR')}] 🛡️ ارزیابی ۶ گیت دکترینال (rules.md):`,
+        `[${new Date().toLocaleTimeString('fa-IR')}]   ✓ RULE-SEC-01 (عدم افشای توکن): کاملاً رعایت شده`,
+        `[${new Date().toLocaleTimeString('fa-IR')}]   ✓ RULE-ARCH-02 (تفکیک بار پردازش): رعایت شده`,
+        `[${new Date().toLocaleTimeString('fa-IR')}]   ✓ RULE-CODE-03 (تایپ‌اسکریپت بدون any): تایید شد`,
+        `[${new Date().toLocaleTimeString('fa-IR')}]   ✓ RULE-NET-06 (رمزنگاری TLS 1.3): تایید شد`
+      ]);
+    }, 1600);
+
+    setTimeout(() => {
+      setMcpAuditProgress(100);
+      setMcpAuditRunnerState('idle');
+      setMcpAuditLogs(prev => [
+        ...prev,
+        `[${new Date().toLocaleTimeString('fa-IR')}] ✅ نتیجه نهایی: گیت قوانین دکترینال پاس شد (PASSED ✓). پروژه با موفقیت اعتبارسنجی گردید.`
+      ]);
+    }, 2400);
+  };
+
+  const handleCopyRulesMarkdown = () => {
+    const md = generateDoctrinalRulesMarkdown(projectRulesState);
+    navigator.clipboard.writeText(md);
+    setMcpCopiedRulesMd(true);
+    setTimeout(() => setMcpCopiedRulesMd(false), 2500);
+  };
+
+  const handleDownloadRulesMarkdown = () => {
+    const md = generateDoctrinalRulesMarkdown(projectRulesState);
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'rules.md';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   // Scheduler State
   const [scheduledTasks, setScheduledTasks] = useState<ScheduledTask[]>([
@@ -1362,9 +1436,9 @@ echo -e "\${CYAN}===============================================================
   };
 
   const handleCopyInstallCommand = () => {
-    let cmd = 'curl -fsSL https://get.omniops.io/install-edge.sh | bash';
+    let cmd = 'curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/install-edge-node.sh | bash';
     if (installMode === 'unattended') {
-      cmd = `curl -fsSL https://get.omniops.io/install-edge.sh | bash -s -- "${masterPublicHost}" "${masterBridgePort}" "${exchangeBridgeToken}" "${installDomain}"`;
+      cmd = `curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/install-edge-node.sh | bash -s -- "${masterPublicHost}" "${masterBridgePort}" "${exchangeBridgeToken}" "${installDomain}"`;
     }
     navigator.clipboard.writeText(cmd);
     setInstallCmdCopied(true);
@@ -1376,9 +1450,10 @@ echo -e "\${CYAN}===============================================================
     if (installSimRunning) return;
     setInstallSimRunning(true);
     setInstallSimLogs([
-      'root@vps-edge-1gb:~# curl -fsSL https://get.omniops.io/install-edge.sh | bash',
+      'root@vps-edge-1gb:~# curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/install-edge-node.sh | bash',
       '[*] ===============================================================================',
       '[*] 🚀 راه‌اندازی نصب‌کننده خودکار پل سرور لبه OmniOps (Lightweight Edge UI Mirror)',
+      '[*] 🛡️ معماری شبکه: Zero-Trust WireGuard Tunneling + Caddy Automated SSL Engine',
       '[*] ===============================================================================',
       '[*] بررسی سخت‌افزار سرور سبک (۱ گیگابایت رم)...',
       '[✓] رم تایید شد: ۱۰۲۴ مگابایت | مصرف حافظه این سرویس: کمتر از ۱۴۰ مگابایت'
@@ -2662,7 +2737,7 @@ omniops_dify_api       Up 6 hours      0.0.0.0:5001->5001/tcp`,
 
 ### ۱. فرمان نصب سرور کنترل مرکزی (Master Control-Plane)
 \`\`\`bash
-curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/install.sh | bash -s -- \\
+curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/install.sh | bash -s -- \\
   --role master \\
   --admin-user "admin" \\
   --admin-pass "OmniOps#2026!Sec" \\
@@ -2672,7 +2747,7 @@ curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/instal
 
 ### ۲. فرمان الحاق سرورهای دوم و سوم به عنوان نود محاسباتی (Worker Compute Nodes)
 \`\`\`bash
-curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/install-worker.sh | bash -s -- \\
+curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/install-worker.sh | bash -s -- \\
   --master "http://IP_OF_MASTER:9000" \\
   --token "omni-node-join-token" \\
   --name "Worker-Node-02" \\
@@ -2680,12 +2755,12 @@ curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/instal
   --agent-port 9001
 \`\`\`
 
-### ۳. فرمان نصب سریع سرور لبه سبک ۱ یا ۲ گیگابایت رم (Lightweight Edge UI Mirror - Pasargad-Style)
-جهت راه‌اندازی اینترفیس گرافیکی وب روی سرورهای سبک دیتاسنتر یا CDN با صدور خودکار SSL و اتصال تونل امن به هسته:
+### ۳. فرمان نصب سریع سرور لبه سبک با محیط تعاملی پایتون (Lightweight Edge UI Mirror - Pasargad-Style)
+جهت راه‌اندازی اینترفیس گرافیکی وب روی سرورهای سبک دیتاسنتر یا CDN با صدور خودکار SSL توسط Caddy و اتصال تونل امن WireGuard به هسته:
 \`\`\`bash
-curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/install-edge-node.sh | bash
+curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/install-edge-node.sh | bash
 \`\`\`
-*(پس از اجرا، اسکریپت به صورت اینتراکتیو آدرس سرور هسته، پورت، کلید تبادل طولانی و نام دامنه را دریافت کرده و گواهی‌نامه SSL را به صورت اتوماتیک صادر می‌نماید)*
+*(پس از اجرا، اسکریپت محیط تعاملی گرافیکی پایتون TUI را بوت کرده و آدرس سرور هسته، پورت، توکن ساختاریافته Zero-Trust و نحوه صدور SSL را دریافت می‌نماید)*
 
 ---
 
@@ -2742,7 +2817,7 @@ curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/instal
   - **سرور لبه و آینه گرافیکی (Edge Node):** یک سرور سبک ۱ یا ۲ گیگابایت رم در دیتاسنتر یا شبکه CDN عمومی که تنها نقش درگاه ورودی وب، پروکسی معکوس و صدور SSL را ایفا می‌کند (مصرف رم کمتر از ۱۵۰ مگابایت).
 - **فرآیند نصب خودکار و تعاملی سرور لبه:**
   ۱. مراجعه به تب اختصاصی **«نصب خودکار لبه» (Installation Tab)** در پنل جهت تنظیم پارامترها و دانلود اسکریپت یا اجرای فرمان تک‌خطی:
-     \`curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/install-edge-node.sh | bash\`
+     \`curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/install-edge-node.sh | bash\`
   ۲. دریافت آدرس پابلیک سرور هسته مرکزی (Core Public IP / Domain)
   ۳. دریافت پورت تبادل و ارتباط با هسته (پیش‌فرض ۹۰۰۰ با **امکان وارد کردن هر پورت دلخواه** از جمله ۸۴۴۳، ۸۰۸۰، ۴۴۴۳ یا هر پورت آزاد بین ۱۰۲۴ تا ۶۵۵۳۵)
   ۴. دریافت کلید تبادل طولانی و امنیتی (Security Token) با **گزینه‌های تولید توکن قوی ۶۴ بایت HMAC-SHA256 یا ۳۲ بایت** یا ثبت رمز دلخواه
@@ -2875,7 +2950,28 @@ sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
       </div>
 
       {/* 2. Responsive Subtab Navigation - Clean Multi-Row Card Grid (Stacking vertically & wrapping responsively) */}
-      <div className="bg-[#121217] border border-neutral-800/80 rounded-2xl p-2.5 shadow-md grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8 gap-2.5">
+      <div className="bg-[#121217] border border-neutral-800/80 rounded-2xl p-2.5 shadow-md grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2.5">
+        {/* Tab 0: Multi-Agent Topology (Level 3 Orchestration Network) */}
+        <button
+          onClick={() => setActiveSubTab('multi_agent_topology')}
+          className={`p-3 rounded-xl text-xs font-semibold transition-all flex flex-col justify-between text-right gap-2 border w-full ${
+            activeSubTab === 'multi_agent_topology'
+              ? 'bg-gradient-to-br from-amber-600/90 via-orange-600/90 to-amber-700 text-white shadow-lg shadow-amber-600/30 border-amber-400/80 ring-1 ring-amber-400/40'
+              : 'bg-[#15151C] text-neutral-300 hover:text-white hover:bg-neutral-800/80 border-neutral-800/80'
+          }`}
+        >
+          <div className="flex items-center justify-between w-full">
+            <span className="font-bold text-xs truncate">توپولوژی ارکستراسیون ایجنت‌ها</span>
+            <div className={`p-1.5 rounded-lg ${activeSubTab === 'multi_agent_topology' ? 'bg-white/20' : 'bg-amber-500/10 text-amber-400'}`}>
+              <Workflow className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="flex items-center justify-between w-full pt-1 border-t border-white/10">
+            <span className="text-[10px] opacity-80 font-mono">Multi-Agent Topology</span>
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-200 font-mono">Level 3 Node</span>
+          </div>
+        </button>
+
         {/* Tab 1: Local Stack & Extensions */}
         <button
           onClick={() => setActiveSubTab('local_stack')}
@@ -2894,6 +2990,29 @@ sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
           <div className="flex items-center justify-between w-full pt-1 border-t border-white/10">
             <span className="text-[10px] opacity-80 font-mono">Local Stack & OmniRoute</span>
             <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-200 font-mono">:9000/:8888</span>
+          </div>
+        </button>
+
+        {/* Tab: Network Topology Overview (D3.js Force Graph) */}
+        <button
+          onClick={() => setActiveSubTab('network_topology')}
+          className={`p-3 rounded-xl text-xs font-semibold transition-all flex flex-col justify-between text-right gap-2 border w-full ${
+            activeSubTab === 'network_topology'
+              ? 'bg-gradient-to-br from-cyan-600/90 to-blue-700 text-white shadow-lg shadow-cyan-600/30 border-cyan-400/60 ring-1 ring-cyan-400/30'
+              : 'bg-[#15151C] text-neutral-300 hover:text-white hover:bg-neutral-800/80 border-neutral-800/80'
+          }`}
+        >
+          <div className="flex items-center justify-between w-full">
+            <span className="font-bold text-xs truncate">توپولوژی زنده شبکه</span>
+            <div className={`p-1.5 rounded-lg ${activeSubTab === 'network_topology' ? 'bg-white/20' : 'bg-cyan-500/10 text-cyan-400'}`}>
+              <Workflow className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="flex items-center justify-between w-full pt-1 border-t border-white/10">
+            <span className="text-[10px] opacity-80 font-mono">D3.js Force Graph</span>
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-200 font-mono">
+              Core · Ollama · n8n · Dify
+            </span>
           </div>
         </button>
 
@@ -3057,6 +3176,29 @@ sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
             </span>
           </div>
         </button>
+
+        {/* Tab 8: MCP Protocol & Doctrinal Rules Gate */}
+        <button
+          onClick={() => setActiveSubTab('mcp_pipeline')}
+          className={`p-3 rounded-xl text-xs font-semibold transition-all flex flex-col justify-between text-right gap-2 border w-full ${
+            activeSubTab === 'mcp_pipeline'
+              ? 'bg-gradient-to-br from-indigo-600/90 to-purple-700 text-white shadow-lg shadow-indigo-600/30 border-indigo-400/60 ring-1 ring-indigo-400/30'
+              : 'bg-[#15151C] text-neutral-300 hover:text-white hover:bg-neutral-800/80 border-neutral-800/80'
+          }`}
+        >
+          <div className="flex items-center justify-between w-full">
+            <span className="font-bold text-xs truncate">پایپ‌لاین MCP و قوانین</span>
+            <div className={`p-1.5 rounded-lg ${activeSubTab === 'mcp_pipeline' ? 'bg-white/20' : 'bg-indigo-500/10 text-indigo-400'}`}>
+              <ShieldCheck className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="flex items-center justify-between w-full pt-1 border-t border-white/10">
+            <span className="text-[10px] opacity-80 font-mono">MCP & Rules Gate</span>
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-200 font-mono">
+              ۴ سرور · ۶ گیت
+            </span>
+          </div>
+        </button>
       </div>
 
       {/* Global Cluster & Node Toast Alert */}
@@ -3074,6 +3216,11 @@ sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
+      )}
+
+      {/* VIEW 0: Multi-Agent Topology (Level 3 Orchestration Network) */}
+      {activeSubTab === 'multi_agent_topology' && (
+        <MultiAgentTopologyDashboard />
       )}
 
       {/* VIEW 1: Local Stack & Modular Add-ons (Core Hub + JEV + AnythingLLM + Langflow + Ollama + n8n) */}
@@ -3180,6 +3327,13 @@ sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
               </div>
             </div>
           </div>
+
+          {/* Network Topology Overview (D3.js Force-Directed Live Mesh Section) */}
+          <NetworkTopologyOverview
+            activeServices={activeServices}
+            onToggleService={handleToggleService}
+            onNavigateToConsole={() => setActiveSubTab('console')}
+          />
 
           {/* Microservices Cards: Core Companion OmniRoute + 6 Autonomous Add-ons */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -3667,6 +3821,17 @@ sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
         </div>
       )}
 
+      {/* VIEW: Network Topology Overview (D3.js Force-Directed Live Mesh Section) */}
+      {activeSubTab === 'network_topology' && (
+        <div className="space-y-6">
+          <NetworkTopologyOverview
+            activeServices={activeServices}
+            onToggleService={handleToggleService}
+            onNavigateToConsole={() => setActiveSubTab('console')}
+          />
+        </div>
+      )}
+
       {/* VIEW 2: Distributed Cluster & Worker Nodes (Master Control-Plane + Worker Nodes) */}
       {activeSubTab === 'cluster_nodes' && (
         <div className="space-y-6">
@@ -4148,7 +4313,7 @@ sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
               <button
                 type="button"
                 onClick={() => {
-                  const cmd = `curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/install-worker.sh | bash -s -- --master "http://${MASTER_NODE_SPECS.ip.split(' ')[0]}:9000" --token "${clusterJoinToken}" --name "Worker-Node-0${workerNodes.length + 1}"`;
+                  const cmd = `curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/install-worker.sh | bash -s -- --master "http://${MASTER_NODE_SPECS.ip.split(' ')[0]}:9000" --token "${clusterJoinToken}" --name "Worker-Node-0${workerNodes.length + 1}"`;
                   copyToClipboard(cmd, 'worker-quick-join');
                   showClusterToast('دستور تک‌خطی اتصال Worker Node کپی شد!');
                 }}
@@ -4164,7 +4329,7 @@ sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
             </div>
 
             <pre className="p-3 bg-black/70 border border-neutral-800 rounded-xl text-xs font-mono text-cyan-300 overflow-x-auto select-all leading-relaxed dir-ltr text-left">
-{`curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/install-worker.sh | bash -s -- --master "http://${MASTER_NODE_SPECS.ip.split(' ')[0]}:9000" --token "${clusterJoinToken}" --name "Worker-Node-0${workerNodes.length + 1}"`}
+{`curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/install-worker.sh | bash -s -- --master "http://${MASTER_NODE_SPECS.ip.split(' ')[0]}:9000" --token "${clusterJoinToken}" --name "Worker-Node-0${workerNodes.length + 1}"`}
             </pre>
             <p className="text-[11px] text-neutral-400 leading-relaxed">
               با اجرای این دستور در سرور دوم یا سوم (Ubuntu 22.04/24.04)، موتور اولاما و پردازنده داکر به صورت خودکار راه‌اندازی شده و مشخصات RAM و هسته‌ها به این پنل اضافه می‌گردد.
@@ -4533,7 +4698,7 @@ sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
               <button
                 type="button"
                 onClick={() => {
-                  const cmd = 'curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/install-edge-node.sh | bash';
+                  const cmd = 'curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/install-edge-node.sh | bash';
                   handleCopyCredential('cmd', cmd);
                 }}
                 className="px-3 py-1.5 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/40 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0"
@@ -4579,9 +4744,9 @@ sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
 
             {/* Code Box 1: Interactive One-Liner */}
             <div>
-              <div className="text-[11px] text-neutral-400 mb-1 font-medium">فرمان نصب اینتراکتیو (پیشنهادی):</div>
+              <div className="text-[11px] text-neutral-400 mb-1 font-medium">فرمان نصب اینتراکتیو با محیط پایتون TUI (پیشنهادی):</div>
               <pre className="p-3.5 bg-black/80 border border-cyan-500/30 rounded-xl text-xs font-mono text-cyan-300 overflow-x-auto select-all leading-relaxed dir-ltr text-left">
-curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/install-edge-node.sh | bash
+curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/install-edge-node.sh | bash
               </pre>
             </div>
 
@@ -4589,7 +4754,7 @@ curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/instal
             <div>
               <div className="text-[11px] text-neutral-400 mb-1 font-medium">فرمان نصب یکجا و بدون توقف با پارامترهای از پیش پرشده (Silent / Unattended):</div>
               <pre className="p-3 bg-black/60 border border-neutral-800 rounded-xl text-xs font-mono text-neutral-300 overflow-x-auto select-all leading-relaxed dir-ltr text-left">
-{`curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/install-edge-node.sh | bash -s -- --core "${masterPublicHost}" --port ${masterBridgePort} --token "${exchangeBridgeToken}" --domain "panel.mycompany-ai.ir" --auto-ssl`}
+{`curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/install-edge-node.sh | bash -s -- --core "${masterPublicHost}" --port ${masterBridgePort} --token "${exchangeBridgeToken}" --domain "panel.mycompany-ai.ir" --auto-ssl`}
               </pre>
             </div>
           </div>
@@ -6794,6 +6959,427 @@ curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/instal
         </div>
       )}
 
+      {/* VIEW: MCP Protocol, Engineering Pipeline & Doctrinal Rules Gate Engine */}
+      {activeSubTab === 'mcp_pipeline' && (
+        <div className="space-y-6">
+          {/* Header Banner */}
+          <div className="bg-gradient-to-r from-indigo-950/70 via-[#13141C] to-purple-950/50 border border-indigo-500/40 rounded-2xl p-5 md:p-6 shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 relative z-10">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 p-0.5 shadow-lg shadow-indigo-600/30 shrink-0">
+                  <div className="w-full h-full bg-[#12131A] rounded-[14px] flex items-center justify-center text-indigo-400">
+                    <ShieldCheck className="w-6 h-6" />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <h3 className="text-base font-bold text-white tracking-wide">
+                      پایپ‌لاین ایجنت هوشمند، سرورهای MCP و گیت قوانین (Rules Gate)
+                    </h3>
+                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono font-bold border border-emerald-500/30">
+                      پروتکل ۴ سرور فعال (ONLINE)
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-mono">
+                      ۶ گیت دکترینال فعال
+                    </span>
+                  </div>
+                  <p className="text-xs text-neutral-300 mt-1 max-w-3xl leading-relaxed">
+                    تفکیک کامل اطلاعات و ابزارهای فنی از محیط چت: مدیریت معماری پروتکل زمینه مدل (Model Context Protocol)، پایش وضعیت سرورهای StdIO/SSE، اعمال قوانین دکترینال و اجرای تست‌های خودکار گیت کیفیتی.
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center gap-2.5 shrink-0 w-full lg:w-auto justify-end">
+                <button
+                  type="button"
+                  onClick={handleCopyRulesMarkdown}
+                  className="px-3.5 py-2 rounded-xl bg-[#161722] hover:bg-[#1E1F2E] border border-neutral-700/80 hover:border-indigo-500/50 text-neutral-200 text-xs font-semibold flex items-center gap-2 transition-all shadow-sm"
+                  title="کپی متن کامل سند قوانین دکترینال (.omniops/rules.md)"
+                >
+                  {mcpCopiedRulesMd ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-indigo-400" />}
+                  <span>{mcpCopiedRulesMd ? 'کپی شد!' : 'کپی سند rules.md'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadRulesMarkdown}
+                  className="px-3.5 py-2 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-200 text-xs font-semibold flex items-center gap-2 transition-all shadow-sm"
+                  title="دانلود فایل rules.md جهت قرار دادن در ریشه پروژه یا .cursorrules"
+                >
+                  <Download className="w-4 h-4 text-indigo-300" />
+                  <span>دانلود rules.md</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleRunMcpAudit('all')}
+                  disabled={mcpAuditRunnerState !== 'idle'}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold flex items-center gap-2 transition-all shadow-lg shadow-indigo-600/25 disabled:opacity-50"
+                  title="اجرای چرخه کامل تست و انطباق گیت کیفیتی پروژه"
+                >
+                  <RefreshCw className={`w-4 h-4 ${mcpAuditRunnerState !== 'idle' ? 'animate-spin' : ''}`} />
+                  <span>اجرای تست گیت کیفیت</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Metrics Bar */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-4 border-t border-neutral-800/80">
+              <div className="bg-[#12131C]/80 border border-neutral-800 rounded-xl p-3">
+                <span className="text-[10px] text-neutral-400 block font-mono">سرورهای پروتکل MCP</span>
+                <span className="text-sm font-bold text-white mt-0.5 block font-mono">۴ سرور متصل</span>
+                <span className="text-[9px] text-emerald-400 font-mono">StdIO & SSE Ready</span>
+              </div>
+              <div className="bg-[#12131C]/80 border border-neutral-800 rounded-xl p-3">
+                <span className="text-[10px] text-neutral-400 block font-mono">ابزارهای در دسترس</span>
+                <span className="text-sm font-bold text-cyan-300 mt-0.5 block font-mono">۱۸ ابزار تخصصی</span>
+                <span className="text-[9px] text-neutral-400">Git · Shell · File · GitHub</span>
+              </div>
+              <div className="bg-[#12131C]/80 border border-neutral-800 rounded-xl p-3">
+                <span className="text-[10px] text-neutral-400 block font-mono">گیت‌های دکترینال فعال</span>
+                <span className="text-sm font-bold text-amber-300 mt-0.5 block font-mono">۶ گیت کیفی</span>
+                <span className="text-[9px] text-amber-400/80">Zero-Secret · Strict Types</span>
+              </div>
+              <div className="bg-[#12131C]/80 border border-neutral-800 rounded-xl p-3">
+                <span className="text-[10px] text-neutral-400 block font-mono">وضعیت انطباق کدهای مخزن</span>
+                <span className="text-sm font-bold text-emerald-400 mt-0.5 block font-mono">۱۰۰٪ تایید شده</span>
+                <span className="text-[9px] text-emerald-400/80">Zero Policy Violations</span>
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 1: MCP Servers Topology (Model Context Protocol) */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-neutral-800">
+              <div className="flex items-center gap-2">
+                <Cpu className="w-4 h-4 text-indigo-400" />
+                <h4 className="text-sm font-bold text-white">
+                  ۱. سرورهای پروتکل MCP فعال (Model Context Protocol Servers - 4 سرور / ۱۸ ابزار)
+                </h4>
+              </div>
+              <span className="text-[11px] text-neutral-400 font-mono">
+                Transport: JSON-RPC over stdio / sse
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {mcpServersState.map((srv) => (
+                <div
+                  key={srv.id}
+                  className="bg-[#14141B] border border-neutral-800/90 hover:border-indigo-500/40 rounded-2xl p-4 space-y-3 transition-all shadow-md group"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+                        {srv.id === 'mcp-git' ? <GitBranch className="w-5 h-5" /> :
+                         srv.id === 'mcp-terminal' ? <Terminal className="w-5 h-5" /> :
+                         srv.id === 'mcp-filesystem' ? <FileCode className="w-5 h-5" /> :
+                         <Globe className="w-5 h-5" />}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h5 className="text-xs font-bold text-white">{srv.name}</h5>
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 font-mono">
+                            {srv.id}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-neutral-400 font-mono mt-0.5 truncate max-w-xs">
+                          {srv.endpoint}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 font-mono font-bold border border-emerald-500/30">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span>Connected</span>
+                      </span>
+                      <span className="text-[9px] text-neutral-500 font-mono">{srv.latencyMs}ms · {srv.transport}</span>
+                    </div>
+                  </div>
+
+                  {/* Command Line Box */}
+                  <div className="bg-[#0e0e13] px-3 py-1.5 rounded-xl border border-neutral-800 font-mono text-[11px] text-neutral-300 flex items-center justify-between">
+                    <span className="truncate">{srv.command}</span>
+                    <span className="text-[10px] text-indigo-400 font-mono shrink-0 mr-2">
+                      {srv.toolsCount} ابزار
+                    </span>
+                  </div>
+
+                  {/* Tools List */}
+                  <div className="space-y-1.5 pt-1">
+                    <span className="text-[10px] text-neutral-400 font-semibold block">ابزارهای ارائه‌شده به هوش مصنوعی:</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {srv.toolsList.map((tool) => (
+                        <div
+                          key={tool.name}
+                          className="bg-[#181822] hover:bg-[#1E1F2C] border border-neutral-800 hover:border-neutral-700 px-2 py-1 rounded-lg text-[11px] font-mono text-neutral-200 transition-colors"
+                          title={`${tool.description} (پارامترها: ${tool.parameters.join(', ') || 'ندارد'})`}
+                        >
+                          <span className="text-indigo-400 font-bold">{tool.name}</span>
+                          {tool.parameters.length > 0 && (
+                            <span className="text-neutral-500 text-[10px] mr-1">({tool.parameters.length})</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* SECTION 2: Doctrinal Rules Engine (.omniops/rules.md) */}
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-neutral-800">
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4 text-amber-400" />
+                <h4 className="text-sm font-bold text-white">
+                  ۲. گیت‌های قوانین دکترینال پروژه (Doctrinal Rules Engine - 6 گیت کیفی)
+                </h4>
+              </div>
+
+              {/* Filter Pills */}
+              <div className="flex items-center gap-1 bg-[#101014] p-1 rounded-xl border border-neutral-800 text-[11px]">
+                {[
+                  { id: 'all', label: 'همه' },
+                  { id: 'security', label: 'امنیت' },
+                  { id: 'architecture', label: 'معماری' },
+                  { id: 'code_style', label: 'تایپ‌اسکریپت' },
+                  { id: 'testing', label: 'تست‌ها' },
+                  { id: 'git_commit', label: 'کامیت' }
+                ].map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setMcpFilterCategory(cat.id as any)}
+                    className={`px-2 py-0.5 rounded-lg transition-all ${
+                      mcpFilterCategory === cat.id
+                        ? 'bg-indigo-600 text-white font-bold'
+                        : 'text-neutral-400 hover:text-white'
+                    }`}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Rules Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {projectRulesState
+                .filter(r => mcpFilterCategory === 'all' || r.category === mcpFilterCategory)
+                .map((rule) => (
+                  <div
+                    key={rule.id}
+                    className="bg-[#14141B] border border-neutral-800/90 hover:border-amber-500/40 rounded-2xl p-4 space-y-3 transition-all shadow-md text-right flex flex-col justify-between"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 font-bold border border-amber-500/20">
+                            {rule.id}
+                          </span>
+                          <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold ${
+                            rule.severity === 'critical' ? 'bg-red-500/20 text-red-300 border border-red-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                          }`}>
+                            {rule.severity.toUpperCase()}
+                          </span>
+                        </div>
+
+                        <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-semibold ${
+                          rule.enforcementAction === 'block_commit' ? 'bg-red-500/15 text-red-400' : 'bg-blue-500/15 text-blue-300'
+                        }`}>
+                          {rule.enforcementAction === 'block_commit' ? 'مسدودسازی کامیت' : 'الزام به اصلاح'}
+                        </span>
+                      </div>
+
+                      <h5 className="text-xs font-bold text-white leading-snug">{rule.title}</h5>
+
+                      <p className="text-[11px] text-neutral-300 leading-relaxed">
+                        {rule.description}
+                      </p>
+
+                      <div className="bg-[#0e0e13] p-2 rounded-xl border border-neutral-800/80 font-mono text-[10px] text-amber-300/90 break-all text-left">
+                        {rule.rulePattern}
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-neutral-800/80 flex items-center justify-between text-[10px] text-neutral-500">
+                      <div className="flex items-center gap-1">
+                        {(rule.tags || []).map(t => (
+                          <span key={t} className="px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-400 font-mono text-[9px]">
+                            #{t}
+                          </span>
+                        ))}
+                      </div>
+                      <span className="text-emerald-400 font-mono">وضعیت: گیت فعال ✓</span>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+
+          {/* SECTION 3: Automation Skills & Live Terminal Simulation Console */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-neutral-800">
+              <div className="flex items-center gap-2">
+                <Terminal className="w-4 h-4 text-emerald-400" />
+                <h4 className="text-sm font-bold text-white">
+                  ۳. ابزارهای مهندسی اتوماسیون و کنسول زنده اعتبارسنجی (Automation Skills & Quality Gate)
+                </h4>
+              </div>
+              <span className="text-[11px] text-neutral-400 font-mono">
+                Loop: MCP Staged Access ➔ Specialist Skills ➔ Rules Gate
+              </span>
+            </div>
+
+            {/* 4 Engineering Specialist Skills Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="bg-[#12131A] border border-neutral-800 rounded-xl p-3.5 space-y-2 hover:border-blue-500/40 transition-all">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono font-bold text-xs text-blue-400">#LintAndTest</span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono">تست و تایپ</span>
+                </div>
+                <p className="text-[11px] text-neutral-400 leading-snug">
+                  اجرای خودکار استاتیک Linter، اعتبارسنجی Strict تایپ‌اسکریپت و اجرای سوئیت تست‌های Vitest
+                </p>
+                <button
+                  type="button"
+                  onClick={() => handleRunMcpAudit('lint')}
+                  disabled={mcpAuditRunnerState !== 'idle'}
+                  className="w-full py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-[11px] font-semibold transition-colors"
+                >
+                  اجرای بررسی #LintAndTest
+                </button>
+              </div>
+
+              <div className="bg-[#12131A] border border-neutral-800 rounded-xl p-3.5 space-y-2 hover:border-purple-500/40 transition-all">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono font-bold text-xs text-purple-400">#AutoTest</span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-mono">پوشش تست</span>
+                </div>
+                <p className="text-[11px] text-neutral-400 leading-snug">
+                  تولید خودکار سناریوهای آزمون واحد با پوشش بالای ۸۰٪ و پیروی از استاندارد سه‌گانه AAA
+                </p>
+                <button
+                  type="button"
+                  onClick={() => handleRunMcpAudit('autotest')}
+                  disabled={mcpAuditRunnerState !== 'idle'}
+                  className="w-full py-1.5 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 text-[11px] font-semibold transition-colors"
+                >
+                  اجرای آزمون #AutoTest
+                </button>
+              </div>
+
+              <div className="bg-[#12131A] border border-neutral-800 rounded-xl p-3.5 space-y-2 hover:border-emerald-500/40 transition-all">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono font-bold text-xs text-emerald-400">#DocGen</span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono">مستندسازی</span>
+                </div>
+                <p className="text-[11px] text-neutral-400 leading-snug">
+                  تدوین مستندات فنی مارک‌داون، داکیومنت توابع زیرساخت سرور و دیاگرام‌های تبادل داده
+                </p>
+                <button
+                  type="button"
+                  onClick={() => handleRunMcpAudit('rules')}
+                  disabled={mcpAuditRunnerState !== 'idle'}
+                  className="w-full py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-[11px] font-semibold transition-colors"
+                >
+                  استخراج مستندات #DocGen
+                </button>
+              </div>
+
+              <div className="bg-[#12131A] border border-neutral-800 rounded-xl p-3.5 space-y-2 hover:border-amber-500/40 transition-all">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono font-bold text-xs text-amber-400">#QualityGate</span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono">گیت کامیت</span>
+                </div>
+                <p className="text-[11px] text-neutral-400 leading-snug">
+                  کنترل سخت‌گیرانه قوانین دکترینال و صدور مجوز کامیت استاندارد Conventional Commit
+                </p>
+                <button
+                  type="button"
+                  onClick={() => handleRunMcpAudit('all')}
+                  disabled={mcpAuditRunnerState !== 'idle'}
+                  className="w-full py-1.5 rounded-lg bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 text-[11px] font-semibold transition-colors"
+                >
+                  اجرای گیت #QualityGate
+                </button>
+              </div>
+            </div>
+
+            {/* Live Terminal Console Box */}
+            <div className="bg-[#0b0c10] border border-neutral-800 rounded-2xl p-4 shadow-inner space-y-3 font-mono">
+              <div className="flex items-center justify-between pb-2 border-b border-neutral-800/80">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500/80 inline-block" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block" />
+                  </div>
+                  <span className="text-xs text-neutral-300 font-bold mr-2">
+                    کنسول زنده ارزیابی کیفی (Quality Gate Live Terminal)
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {mcpAuditRunnerState !== 'idle' && (
+                    <span className="text-[11px] text-indigo-400 animate-pulse font-mono">
+                      در حال پردازش ({mcpAuditProgress}%)...
+                    </span>
+                  )}
+                  {mcpAuditLogs.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setMcpAuditLogs([])}
+                      className="text-[10px] text-neutral-500 hover:text-neutral-300 transition-colors"
+                    >
+                      پاک کردن لاگ‌ها
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              {mcpAuditRunnerState !== 'idle' && (
+                <div className="w-full bg-neutral-900 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className="bg-gradient-to-r from-indigo-500 to-purple-500 h-1.5 transition-all duration-300"
+                    style={{ width: `${mcpAuditProgress}%` }}
+                  />
+                </div>
+              )}
+
+              {/* Log Stream Output */}
+              <div className="min-h-[140px] max-h-60 overflow-y-auto space-y-1.5 text-xs text-left" dir="ltr">
+                {mcpAuditLogs.length === 0 ? (
+                  <div className="text-neutral-500 text-xs italic py-6 text-center" dir="rtl">
+                    برای بررسی انطباق سورس‌کد با پروتکل MCP و قوانین دکترینال، بر روی دکمه «اجرای تست گیت کیفیت» کلیک فرمایید.
+                  </div>
+                ) : (
+                  mcpAuditLogs.map((log, idx) => (
+                    <div
+                      key={idx}
+                      className={`leading-relaxed ${
+                        log.includes('✅') || log.includes('✓') ? 'text-emerald-400' :
+                        log.includes('🚀') || log.includes('🔍') ? 'text-cyan-400' :
+                        log.includes('🛡️') || log.includes('⚡') ? 'text-purple-400' :
+                        'text-neutral-300'
+                      }`}
+                    >
+                      {log}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL: Create New Scheduled Task */}
       {isCreatingSchedule && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
@@ -7257,7 +7843,7 @@ curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/instal
                   <button
                     type="button"
                     onClick={() => {
-                      const cmd = `curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/install-worker.sh | bash -s -- --master "${workerJoinMasterUrl}" --token "${clusterJoinToken}" --name "${workerJoinNodeName}"`;
+                      const cmd = `curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/install-worker.sh | bash -s -- --master "${workerJoinMasterUrl}" --token "${clusterJoinToken}" --name "${workerJoinNodeName}"`;
                       copyToClipboard(cmd, 'worker-install-cmd');
                       showClusterToast('دستور الحاق Worker Node کپی شد!');
                     }}
@@ -7269,7 +7855,7 @@ curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/instal
                 </div>
 
                 <pre className="p-3.5 bg-black/60 border border-neutral-800 rounded-xl text-xs font-mono text-cyan-300 overflow-x-auto select-all leading-relaxed dir-ltr text-left">
-{`curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/install-worker.sh | bash -s -- --master "${workerJoinMasterUrl}" --token "${clusterJoinToken}" --name "${workerJoinNodeName}"`}
+{`curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/install-worker.sh | bash -s -- --master "${workerJoinMasterUrl}" --token "${clusterJoinToken}" --name "${workerJoinNodeName}"`}
                 </pre>
               </div>
 
@@ -8589,7 +9175,7 @@ curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/instal
                       </button>
                     </div>
                     <pre className="bg-black/70 p-3 rounded-lg border border-neutral-800 font-mono text-xs text-cyan-300 text-left dir-ltr select-all">
-curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/install-edge-node.sh | bash
+curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/install-edge-node.sh | bash
                     </pre>
                   </div>
                 </div>

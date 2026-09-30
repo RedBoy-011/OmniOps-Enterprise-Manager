@@ -101,7 +101,7 @@ def proxy_settings():
 def github_settings():
     if request.method == 'GET':
         return jsonify({
-            'repo_url': SystemSettingModel.get('github_repo_url', 'https://github.com/omniops/omniops-enterprise'),
+            'repo_url': SystemSettingModel.get('github_repo_url', 'https://github.com/RedBoy-011/OmniOps-Enterprise-Manager'),
             'current_version': '1.0.0',
             'latest_commit': 'Initial Enterprise Release'
         })

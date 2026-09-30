@@ -18,5 +18,5 @@ class Config:
     DEFAULT_SOCKS5_ENABLED = os.environ.get('SOCKS5_ENABLED', 'false').lower() == 'true'
 
     # GitHub Updates
-    GITHUB_REPO_URL = os.environ.get('GITHUB_REPO_URL', 'https://github.com/omniops/omniops-enterprise')
+    GITHUB_REPO_URL = os.environ.get('GITHUB_REPO_URL', 'https://github.com/RedBoy-011/OmniOps-Enterprise-Manager')
     DEFAULT_SERVER_PORT = int(os.environ.get('PORT', 8080))

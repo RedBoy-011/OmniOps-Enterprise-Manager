@@ -44,6 +44,7 @@
     - ۱۰.۳. [مهارت‌های تخصصی ایجنت: #LintAndTest, #AutoTest, #DocGen, #QualityGate](#۱۰۳-مهارتهای-تخصصی-ایجنت-lintandtest-autotest-docgen-qualitygate)
     - ۱۰.۴. [سند بالادستی SYSTEM_RULES.md، سیاست افشای صفر توکن و پچ اصلاحی](#۱۰۴-سند-بالادستی-system_rulesmd-سیاست-افشای-صفر-توکن-و-پچ-اصلاحی)
     - ۱۰.۵. [پوسته و دسترسی‌پذیری سازمانی (Theme Toggle - WCAG AA)](#۱۰۵-پوسته-و-دسترسیپذیری-سازمانی-theme-toggle---wcag-aa)
+    - ۱۰.۶. [نمای توپولوژی زنده شبکه و گراف ارتباطات D3.js (Force-Directed Graph)](#۱۰۶-نمای-توپولوژی-زنده-شبکه-و-گراف-ارتباطات-d3js-force-directed-graph)
 
 ---
 
@@ -55,7 +56,7 @@
 این دستور پیش‌نیازها، پایتون، داکر، شبکه امن مش، پنل وب ادمین و ماژول‌های مرکزی را در کمتر از ۳ دقیقه نصب و راه‌اندازی می‌کند:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/install.sh | bash -s -- \
   --role master \
   --admin-user "admin" \
   --admin-pass "OmniOps#2026!Sec" \
@@ -76,7 +77,7 @@ curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/instal
 این دستور روی سرورهای دوم و سوم که دارای منابع پردازشی قوی (RAM بالا یا کارت گرافیک‌های NVIDIA) هستند اجرا می‌شود تا بی‌درنگ به استخر پردازشی متصل شوند:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/install-worker.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/install-worker.sh | bash -s -- \
   --master "http://192.168.1.100:9000" \
   --token "omni-node-join-token-sec99" \
   --name "Worker-Node-GPU-02" \
@@ -213,7 +214,7 @@ curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/instal
 
 ```bash
 # اجرا روی ترمینال سرور ورکر (مثلاً با رم ۶۴ گیگابایت و کارت گرافیک RTX 4090)
-curl -fsSL https://raw.githubusercontent.com/omniops-enterprise/core/main/install-worker.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/install-worker.sh | bash -s -- \
   --master "http://192.168.1.100:9000" \
   --token "omni-node-join-token-sec99" \
   --name "Node-GPU-02" \
@@ -510,6 +511,24 @@ graph TD
 * **پوسته تیره کنتراست بالا (High-Contrast Dark Theme):** بهینه‌سازی شده برای مانیتورینگ شبانه و اتاق‌های کنترل (NOC/SOC).
 * **پوسته روشن خنثی (Neutral Light Theme):** با رنگ‌های پس‌زمینه استاندارد و کنتراست شفاف جهت دفاتر اداری و محیط‌های روشن.
 * **سوئیچ سریع (Sun / Moon):** تعبیه‌شده در نوار هدر اصلی و ماژول تنظیمات با قابلیت ذخیره‌سازی ماندگار در مرورگر.
+
+### ۱۰.۶. نمای توپولوژی زنده شبکه و گراف ارتباطات D3.js (Force-Directed Graph)
+در ماژول مدیریت سرور (Server Management)، بخش **Network Topology Overview** با استفاده از موتور ریاضی و بصری **D3.js Force Simulation** توسعه یافته است:
+* **پایش چهار نود استراتژیک (Core, Ollama, n8n, Dify):**
+  1. **OmniOps Core Hub (:9000):** مستر کنترل‌پلین کلاستر با حلقه نئونی آبی.
+  2. **Ollama Inference Daemon (:11434):** موتور مدل‌های محلی هوش مصنوعی با نود زمردی.
+  3. **n8n Workflow Automation (:5678):** موتور وب‌هوک و هماهنگ‌کننده فرآیندها با رنگ نارنجی.
+  4. **Dify GenAI Platform (:8080):** سکوی ایجنت‌های سازمانی با نود فیروزه‌ای (Cyan).
+* **شبیه‌سازی فیزیک گرانش و تعاملی کامل:**
+  * قابلیت کشیدن و رها کردن (Drag & Drop) نودها در فضا با توزیع خودکار گرانش و ممانعت از برخورد.
+  * قابلیت بزرگنمایی و پیمایش آزاد (Pan & Zoom) در بوم دوبعدی شبکه.
+  * امکان توقف و آغاز مجدد فیزیک حرکت نودها (`Pause/Play Physics`).
+* **انیمیشن حرکت بسته‌های داده (Packet Particle Flow):**
+  * حرکت پیوسته ذرات فوتونی در طول کانال‌های فعال بین Core، Ollama، n8n و Dify نشان‌دهنده تبادل فریم‌های زنده و سلامت است.
+* **پنل تله‌متری و بازرسی زنده (Telemetry Inspector):**
+  * با کلیک بر روی هر نود، پنل بازرسی وضعیت پورت، RTT پینگ میلی‌ثانیه‌ای، مصرف حافظه و پردازنده و لاگ‌های شناسه داکر را نمایش می‌دهد.
+  * با کلیک بر روی هر خط ارتباطی، نوع پروتکل (mTLS gRPC، EventMesh یا WebSocket) و پهنای باند لحظه‌ای قابل بررسی است.
+  * دکمه پینگ تمام نودها (`Ping All Nodes`) جهت بررسی آنی پاسخ‌دهی و پایش کلاستر.
 
 ---
 

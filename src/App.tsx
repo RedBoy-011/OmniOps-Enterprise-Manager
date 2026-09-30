@@ -12,7 +12,10 @@ import {
   ToolExecutionAction,
   SystemLogEntry,
   ProjectRuleItem,
-  McpServerConfig
+  McpServerConfig,
+  AgentCommandProposal,
+  AgentCommandStep,
+  ChatMessage
 } from './types';
 import { DEFAULT_PROVIDERS } from './data/providersData';
 import { ENTERPRISE_SKILLS } from './data/skillsData';
@@ -316,6 +319,7 @@ export default function App() {
 
   // Dynamic models state (Auto-fetched & sorted)
   const [availableModels, setAvailableModels] = useState<AiModel[]>([
+    { id: 'ember-1', provider: 'ember', model_id: 'ember-1-agentic', display_name: 'Ember-1 (مدل تخصصی داخلی - ابزارساز و کد سبک و Vision)', context_length: 65536, status: 'online', latency_ms: 12, is_recommended: true, supports_image_generation: true, supports_video_generation: false, supports_vision: true },
     { id: 'gemini-2.5-flash', provider: 'gemini', model_id: 'gemini-2.5-flash', display_name: 'Gemini 2.5 Flash', context_length: 1048576, status: 'online', latency_ms: 85, is_recommended: true, supports_image_generation: true, supports_video_generation: true, supports_vision: true },
     { id: 'gemini-2.5-pro', provider: 'gemini', model_id: 'gemini-2.5-pro', display_name: 'Gemini 2.5 Pro', context_length: 2097152, status: 'online', latency_ms: 220, is_recommended: false, supports_image_generation: true, supports_video_generation: true, supports_vision: true },
     { id: 'gpt-4o', provider: 'openai', model_id: 'gpt-4o', display_name: 'OpenAI GPT-4o (Omni)', context_length: 128000, status: 'online', latency_ms: 280, is_recommended: true, supports_image_generation: true, supports_video_generation: true, supports_vision: true },
@@ -593,11 +597,11 @@ add chain=forward action=accept connection-state=established,related comment="Ac
         defaultCmd: 'chrome.tabs.query({ active: true, currentWindow: true }); chrome.runtime.sendMessage({ action: "inspect_dom_and_network" });'
       };
     }
-    if (lower.includes('میکروتیک') || lower.includes('winbox') || lower.includes('routeros') || lower.includes('/ip firewall') || lower.includes('فایروال میکروتیک')) {
+    if (lower.includes('میکروتیک') || lower.includes('winbox') || lower.includes('routeros') || lower.includes('/ip firewall') || lower.includes('فایروال میکروتیک') || lower.includes('روتر') || lower.includes('جدول روت') || lower.includes('روت‌های')) {
       return { 
         toolId: 't-winbox', 
-        toolName: 'MikroTik Winbox v3.40', 
-        defaultCmd: '/ip firewall filter print count-only\n/ip service print where disabled=no\n/ip route print count-only' 
+        toolName: 'MikroTik Winbox v3.40 (RouterOS)', 
+        defaultCmd: '/ip route print where active\n/interface print brief\n/ip firewall filter print count-only' 
       };
     }
     if (lower.includes('وایردشارک') || lower.includes('wireshark') || lower.includes('شنود') || lower.includes('پکت') || lower.includes('tshark') || lower.includes('ترافیک شبکه') || lower.includes('کپچر')) {
@@ -611,7 +615,7 @@ add chain=forward action=accept connection-state=established,related comment="Ac
       return { 
         toolId: 't-nmap', 
         toolName: 'Nmap Security Scanner', 
-        defaultCmd: 'nmap -sS -T4 -p 22,80,443,8080,11434 192.168.1.1/24' 
+        defaultCmd: 'nmap -sS -T4 -p 22,80,443,8080,8291,11434 192.168.1.0/24' 
       };
     }
     if (lower.includes('ماوس') || lower.includes('کیبورد') || lower.includes('کلیک') || lower.includes('hid') || lower.includes('تایپ') || lower.includes('شبیه‌سازی ماوس')) {
@@ -621,25 +625,25 @@ add chain=forward action=accept connection-state=established,related comment="Ac
         defaultCmd: 'agent.hid.moveCursor(x=640, y=480); agent.hid.click(button="left"); agent.hid.keyPress("ENTER");' 
       };
     }
-    if (lower.includes('پاورشل') || lower.includes('سرویس‌های ویندوز') || lower.includes('ویندوز') || lower.includes('winrm') || lower.includes('powershell') || lower.includes('get-service')) {
+    if (lower.includes('پاورشل') || lower.includes('سرویس‌های ویندوز') || lower.includes('ویندوز') || lower.includes('winrm') || lower.includes('powershell') || lower.includes('get-service') || lower.includes('مصرف ram') || lower.includes('رم ویندوز') || lower.includes('کلاینت ویندوز') || lower.includes('سرویس ویندوز') || lower.includes('منابع ویندوز')) {
       return { 
         toolId: 't-winrm', 
         toolName: 'Windows Remote Management (WinRM)', 
-        defaultCmd: 'powershell -ExecutionPolicy Bypass -Command "Get-Service -Name *Omni*, *Docker*, *WinRM* | Select-Object Name, Status, StartType"' 
+        defaultCmd: 'powershell -ExecutionPolicy Bypass -Command "Get-Service | Where-Object {$_.Status -eq \'Running\'} | Select-Object -First 10 Name, Status, StartType; Get-Process | Sort-Object WorkingSet -Descending | Select-Object -First 5 ProcessName, @{Name=\'RAM (MB)\';Expression={[math]::Round($_.WorkingSet/1MB,1)}}"' 
       };
     }
-    if (lower.includes('putty') || lower.includes('سیسکو') || lower.includes('سوئیچ') || lower.includes('cisco') || lower.includes('ترانک')) {
+    if (lower.includes('putty') || lower.includes('سیسکو') || lower.includes('سوئیچ') || lower.includes('سوییچ') || lower.includes('cisco') || lower.includes('ترانک') || lower.includes('پورت‌های سوییچ') || lower.includes('پورت سوییچ') || lower.includes('پورت‌های سوئیچ') || lower.includes('اینترفیس‌های فعال') || lower.includes('اینترفیس سوییچ') || lower.includes('vlan')) {
       return { 
         toolId: 't-putty', 
-        toolName: 'PuTTY / Cisco CLI', 
-        defaultCmd: 'ssh admin@192.168.1.2 "show ip interface brief | exclude unassigned"' 
+        toolName: 'PuTTY / Cisco Switch CLI', 
+        defaultCmd: 'ssh admin@192.168.1.2 "show ip interface brief | exclude unassigned; show vlan brief"' 
       };
     }
-    if (lower.includes('کانتینر') || lower.includes('داکر') || lower.includes('docker') || lower.includes('دستور شل') || lower.includes('ترمینال') || lower.includes('ufw') || lower.includes('netstat')) {
+    if (lower.includes('کانتینر') || lower.includes('داکر') || lower.includes('docker') || lower.includes('دستور شل') || lower.includes('ترمینال') || lower.includes('ufw') || lower.includes('netstat') || lower.includes('سرور لینوکس') || lower.includes('سرور') || lower.includes('nginx') || lower.includes('وب‌سرور') || lower.includes('فایروال سرور')) {
       return { 
         toolId: 't-terminal', 
         toolName: 'Terminal Shell Execution (Root)', 
-        defaultCmd: 'docker ps --format "table {{.Names}}\\t{{.Status}}\\t{{.Ports}}"' 
+        defaultCmd: 'systemctl status nginx --no-pager | head -n 8; docker ps --format "table {{.Names}}\\t{{.Status}}\\t{{.Ports}}"' 
       };
     }
     if (lower.includes('اسکرین') || lower.includes('اسکرین‌شات') || lower.includes('تصویر دسکتاپ') || lower.includes('screen capture')) {
@@ -734,6 +738,325 @@ OCR Engine: Text detected in capture (14 labels matched).`;
     }
   };
 
+  // Helper to generate intelligent Agent Command Proposal with Chain-of-Thought & Steps
+  const generateAgentCommandProposal = (
+    tool: { toolId: string; toolName: string; defaultCmd: string },
+    userPrompt: string,
+    isPermitted: boolean,
+    user?: User
+  ): AgentCommandProposal => {
+    let intentSummary = '';
+    let reasoning = '';
+    let targetSystem: AgentCommandProposal['targetSystem'] = 'general';
+    let executionArm = 'بازوی اجرایی محلی';
+    let steps: AgentCommandStep[] = [];
+
+    switch (tool.toolId) {
+      case 't-putty':
+        targetSystem = 'cisco';
+        executionArm = 'Network Bridge via SSH / PuTTY (192.168.1.2)';
+        intentSummary = 'استعلام اینترفیس‌ها، بررسی وضعیت ترانک‌ها و سلامت سخت‌افزار سوئیچ سیسکو';
+        reasoning = 'با بررسی نوع درخواست شما در زمینه شبکه، پروتکل SSH به سوئیچ مرکزی (192.168.1.2) با اکانت مانیتورینگ شبکه انتخاب شد تا وضعیت اینترفیس‌ها، ترانک‌ها و VLANها بدون ایجاد بار روی سوئیچ استخراج گردد.';
+        steps = [
+          { stepNumber: 1, title: 'استعلام اینترفیس‌ها و وضعیت پورت‌های متصل', command: 'ssh admin@192.168.1.2 "show ip interface brief | exclude unassigned"', status: 'pending' },
+          { stepNumber: 2, title: 'بررسی وضعیت جدول VLANها و ترانک‌های شبکه', command: 'ssh admin@192.168.1.2 "show vlan brief"', status: 'pending' },
+          { stepNumber: 3, title: 'سنجش سلامت سخت‌افزار و پایداری آپ‌تایم', command: 'ssh admin@192.168.1.2 "show version | include uptime"', status: 'pending' }
+        ];
+        break;
+      case 't-winrm':
+        targetSystem = 'windows';
+        executionArm = user?.agent_connected ? 'Windows Agent v2.4 (Port 8443)' : 'Local Host WinRM';
+        intentSummary = 'پایش سرویس‌های در حال اجرا، میزان اشغال RAM و وضعیت کلاینت ویندوز';
+        reasoning = 'برای این دستور، ارتباط امن با ماژول PowerShell از طریق WinRM (پورت 8443 ایجنت لوکال) انتخاب شد تا وضعیت پروسه‌های پرمصرف حافظه و سرویس‌های در حال اجرا بدون دستکاری نامطلوب استخراج شوند.';
+        steps = [
+          { stepNumber: 1, title: 'استعلام وضعیت سرویس‌های در حال اجرا', command: 'powershell -Command "Get-Service | Where-Object {$_.Status -eq \'Running\'} | Select-Object -First 8 Name, Status"', status: 'pending' },
+          { stepNumber: 2, title: 'استخراج ۵ پروسه پرمصرف حافظه RAM', command: 'powershell -Command "Get-Process | Sort-Object WorkingSet -Descending | Select-Object -First 5 ProcessName, @{Name=\'RAM (MB)\';Expression={[math]::Round($_.WorkingSet/1MB,1)}}"', status: 'pending' },
+          { stepNumber: 3, title: 'بررسی سلامت پورت 8443 ایجنت ویندوزی', command: 'powershell -Command "Get-NetTCPConnection -LocalPort 8443 -ErrorAction SilentlyContinue"', status: 'pending' }
+        ];
+        break;
+      case 't-terminal':
+        targetSystem = 'linux';
+        executionArm = 'Linux Core Node / Master Control-Plane';
+        intentSummary = 'پایش وب‌سرور Nginx، وضعیت کانتینرهای فعال داکر و فایروال سرور لینوکس';
+        reasoning = 'با تحلیل نود مرکزی لینوکس، استفاده از شل امن به ما اجازه می‌دهد وضعیت کانتینرهای فعال داکر و وب‌سرور Nginx را بدون ایجاد تغییر ناخواسته در فایل‌های پیکربندی استعلام کنیم.';
+        steps = [
+          { stepNumber: 1, title: 'استعلام سلامت وب‌سرور Nginx', command: 'systemctl status nginx --no-pager | head -n 8', status: 'pending' },
+          { stepNumber: 2, title: 'بررسی کانتینرهای در حال اجرای داکر', command: 'docker ps --format "table {{.Names}}\\t{{.Status}}\\t{{.Ports}}"', status: 'pending' },
+          { stepNumber: 3, title: 'بررسی جدول رول‌های فعال فایروال UFW', command: 'ufw status numbered', status: 'pending' }
+        ];
+        break;
+      case 't-winbox':
+        targetSystem = 'mikrotik';
+        executionArm = 'MikroTik API SSL (Port 8729)';
+        intentSummary = 'بررسی جدول روت‌های فعال، ترافیک اینترفیس‌ها و رول‌های فایروال میکروتیک';
+        reasoning = 'برقراری ارتباط از طریق API SSL رمزنگاری‌شده روتربرد میکروتیک جهت پایش جریان پکت‌ها و جدول مسیریابی بدون نیاز به باز کردن کامل Winbox گرافیکی.';
+        steps = [
+          { stepNumber: 1, title: 'استعلام جدول روت‌های فعال گیت‌وی', command: '/ip route print where active', status: 'pending' },
+          { stepNumber: 2, title: 'پایش ترافیک خلاصه اینترفیس‌ها', command: '/interface print brief', status: 'pending' },
+          { stepNumber: 3, title: 'شمارش پکت‌های دراپ‌شده در فایروال', command: '/ip firewall filter print count-only', status: 'pending' }
+        ];
+        break;
+      case 't-nmap':
+        targetSystem = 'security';
+        executionArm = 'Nmap Security Scanner v7.94';
+        intentSummary = 'اسکن امنیتی پورت‌های باز و سرویس‌های فعال شبکه محلی';
+        reasoning = 'اجرای اسکن TCP SYN بر روی رنج گیت‌وی برای کشف سرویس‌ها با حفظ دسترس‌پذیری و حداقل ایجاد نویز در لاگ‌های امنیتی.';
+        steps = [
+          { stepNumber: 1, title: 'اسکن سریع پورت‌های استاندارد گیت‌وی (80, 443, 22, 8729)', command: 'nmap -sS -p 22,80,443,8080,8729 192.168.1.1', status: 'pending' }
+        ];
+        break;
+      default:
+        targetSystem = 'general';
+        executionArm = 'سیستم ایجنت OmniOps';
+        intentSummary = `اجرای درخواست عملیاتی با ابزار ${tool.toolName}`;
+        reasoning = `تشخیص نیاز به بازوی اجرایی ${tool.toolName} بر اساس تحلیل متن و زمینه گفتگو.`;
+        steps = [
+          { stepNumber: 1, title: `اجرای مستقیم دستور در ${tool.toolName}`, command: tool.defaultCmd, status: 'pending' }
+        ];
+    }
+
+    return {
+      id: `prop-${Date.now()}`,
+      intentSummary,
+      reasoning,
+      targetSystem,
+      toolId: tool.toolId,
+      toolName: tool.toolName,
+      executionArm,
+      command: tool.defaultCmd,
+      steps,
+      status: 'pending_approval',
+      requiresRbacCheck: true,
+      isRbacSatisfied: isPermitted,
+      rbacDeniedReason: isPermitted ? undefined : `حساب کاربری @${user?.username || 'کاربر'} با نقش ${user?.role || 'کاربر'} فاقد دسترسی به ابزار «${tool.toolName}» در مشخصات پروفایل است.`
+    };
+  };
+
+  // Handler for approving command proposals from chat (Full or Step-by-Step)
+  const handleApproveProposal = async (sessionId: string, messageId: string, mode: 'full' | 'step') => {
+    const session = sessions.find((s) => s.id === sessionId);
+    if (!session) return;
+    const msg = session.messages.find((m) => m.id === messageId);
+    if (!msg || !msg.command_proposal) return;
+
+    const proposal = msg.command_proposal;
+
+    // Strict RBAC check based on user profile
+    const userAllowedTools: string[] = currentUser?.allowed_tools !== undefined
+      ? currentUser.allowed_tools
+      : (currentUser?.role === 'SuperAdmin' 
+          ? ['t-chrome', 't-winbox', 't-wireshark', 't-nmap', 't-putty', 't-winrm', 't-hid', 't-screen', 't-terminal']
+          : currentUser?.role === 'Admin'
+          ? ['t-chrome', 't-winbox', 't-wireshark', 't-nmap', 't-putty', 't-winrm']
+          : []);
+
+    const isPermitted = userAllowedTools.includes(proposal.toolId);
+
+    if (!isPermitted) {
+      const updatedProposal: AgentCommandProposal = {
+        ...proposal,
+        status: 'permission_denied',
+        isRbacSatisfied: false,
+        rbacDeniedReason: `عدم احراز شرایط: حساب کاربری @${currentUser?.username} فاقد مجوز ابزار «${proposal.toolName}» است.`
+      };
+
+      const denialMsg: ChatMessage = {
+        id: `a-${Date.now()}`,
+        role: 'assistant',
+        content: `⛔ **عدم احراز شرایط امنیتی در پروفایل کاربر (@${currentUser?.username}):**\n\nدرخواست اجرای فرمان شما به دلیل عدم تطابق اختیارات پروفایل کاربری با ابزار «${proposal.toolName}» متوقف گردید.\nسیاست RBAC اجازه فراخوانی خودکار این API را صادر نکرد.\n\n💡 جهت دریافت دسترسی، با مدیر ارشد سیستم تماس بگیرید تا در تب «کاربران و امنیت» دسترسی به این ابزار به حساب شما تخصیص یابد.`,
+        timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
+        is_tool_command: true
+      };
+
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === sessionId
+            ? {
+                ...s,
+                messages: s.messages.map((m) => (m.id === messageId ? { ...m, command_proposal: updatedProposal } : m)).concat(denialMsg)
+              }
+            : s
+        )
+      );
+      return;
+    }
+
+    if (mode === 'full') {
+      const executedSteps = proposal.steps.map((st) => ({
+        ...st,
+        status: 'completed' as const,
+        output: generateToolOutput(proposal.toolId, st.command)
+      }));
+
+      const allOutput = executedSteps.map((st) => `[گام ${st.stepNumber}: ${st.title}]\n${st.output}`).join('\n\n');
+
+      const updatedProposal: AgentCommandProposal = {
+        ...proposal,
+        status: 'completed',
+        approvedMode: 'full',
+        steps: executedSteps,
+        finalResultSummary: `تمام گام‌های عملیاتی توسط بازوی «${proposal.toolName}» با موفقیت اجرا شد و خروجی کامل دریافت گردید.`
+      };
+
+      let summaryAnalysis = '';
+      if (proposal.targetSystem === 'cisco') {
+        summaryAnalysis = `📊 **تحلیل نتیجه و گزارش نهایی سوئیچ سیسکو:**\n• وضعیت اینترفیس‌ها: تمام پورت‌های GigabitEthernet0/1 و 0/2 در وضعیت UP/UP و نرمال قرار دارند.\n• ترانک و VLAN: اینترفیس 0/2 به عنوان پورت ترانک فعال است و ترافیک VLANهای 10 و 20 را بدون پکت‌لاس هدایت می‌کند.\n• آپ‌تایم: سوئیچ با بیش از ۴۲ هفته آپ‌تایم مداوم، بدون هیچ‌گونه کرش یا خطای بافر کاملاً پایدار است.`;
+      } else if (proposal.targetSystem === 'windows') {
+        summaryAnalysis = `📊 **تحلیل نتیجه و گزارش نهایی کلاینت ویندوز:**\n• سرویس‌ها: سرویس‌های حیاتی ویندوز (OmniOpsAgent، com.docker.service، WinRM) در وضعیت Running هستند.\n• حافظه RAM: پروسه‌های پس‌زمینه در حد مجاز قرار دارند و هیچ‌گونه نشت حافظه (Memory Leak) مشاهده نشد.\n• ارتباط ایجنت: پورت 8443 لیسن فعال دارد و آماده تبادل دستورات است.`;
+      } else if (proposal.targetSystem === 'linux') {
+        summaryAnalysis = `📊 **تحلیل نتیجه و گزارش نهایی سرور لینوکس:**\n• وب‌سرور Nginx: سرویس با موفقیت در حال شنود ترافیک ورودی است (Active: running).\n• کانتینرهای داکر: سرویس‌های Ollama، n8n، Dify، Redis و Postgres همگی آپ‌تایم ۶ ساعته پایدار دارند.\n• فایروال: پورت‌های ضروری باز و قوانین ایزولاسیون فعال هستند.`;
+      } else {
+        summaryAnalysis = `📊 **تحلیل نتیجه و گزارش نهایی:**\n• فرآیند فرامین با موفقیت خاتمه یافت و تمام شاخص‌های خروجی در وضعیت نرمال و مطلوب ثبت شدند.`;
+      }
+
+      const summaryMsg: ChatMessage = {
+        id: `a-${Date.now()}`,
+        role: 'assistant',
+        content: `خروجی کامل فرامین در کنسول ثبت شد:\n\n${summaryAnalysis}`,
+        timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
+        is_tool_command: true,
+        tool_execution: {
+          id: `act-${Date.now()}`,
+          tool_id: proposal.toolId,
+          tool_name: proposal.toolName,
+          command: proposal.command,
+          status: 'success',
+          execution_arm: proposal.executionArm,
+          output: allOutput,
+          executed_at: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })
+        }
+      };
+
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === sessionId
+            ? {
+                ...s,
+                messages: s.messages.map((m) => (m.id === messageId ? { ...m, command_proposal: updatedProposal } : m)).concat(summaryMsg)
+              }
+            : s
+        )
+      );
+    } else {
+      // mode === 'step' -> execute step 0
+      const executedSteps = proposal.steps.map((st, idx) => {
+        if (idx === 0) {
+          return {
+            ...st,
+            status: 'completed' as const,
+            output: generateToolOutput(proposal.toolId, st.command)
+          };
+        }
+        return st;
+      });
+
+      const updatedProposal: AgentCommandProposal = {
+        ...proposal,
+        status: 'approved_step',
+        approvedMode: 'step',
+        currentStepIndex: 1,
+        steps: executedSteps
+      };
+
+      const step1Msg: ChatMessage = {
+        id: `a-${Date.now()}`,
+        role: 'assistant',
+        content: `✅ **گام ۱ با موفقیت اجرا شد:** «${proposal.steps[0].title}»\nخروجی اولیه استخراج گردید. جهت ادامه عملیات، می‌توانید روی کلید «اجرای مرحله ۲» کلیک نمایید.`,
+        timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
+        is_tool_command: true
+      };
+
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === sessionId
+            ? {
+                ...s,
+                messages: s.messages.map((m) => (m.id === messageId ? { ...m, command_proposal: updatedProposal } : m)).concat(step1Msg)
+              }
+            : s
+        )
+      );
+    }
+  };
+
+  // Handler for executing subsequent steps in step-by-step mode
+  const handleExecuteProposalStep = async (sessionId: string, messageId: string, stepNumber: number) => {
+    const session = sessions.find((s) => s.id === sessionId);
+    if (!session) return;
+    const msg = session.messages.find((m) => m.id === messageId);
+    if (!msg || !msg.command_proposal) return;
+
+    const proposal = msg.command_proposal;
+    const stepIdx = stepNumber - 1;
+
+    const executedSteps = proposal.steps.map((st, idx) => {
+      if (idx === stepIdx) {
+        return {
+          ...st,
+          status: 'completed' as const,
+          output: generateToolOutput(proposal.toolId, st.command)
+        };
+      }
+      return st;
+    });
+
+    const isLastStep = stepNumber >= proposal.steps.length;
+
+    const updatedProposal: AgentCommandProposal = {
+      ...proposal,
+      status: isLastStep ? 'completed' : 'approved_step',
+      currentStepIndex: isLastStep ? proposal.steps.length : stepNumber,
+      steps: executedSteps
+    };
+
+    let followUpMsg: ChatMessage;
+    if (isLastStep) {
+      followUpMsg = {
+        id: `a-${Date.now()}`,
+        role: 'assistant',
+        content: `🎉 **تمام مراحل با موفقیت به پایان رسید:**\nتمام دستورات بازوی «${proposal.toolName}» با موفقیت اجرا و تحلیل شدند. وضعیت زیرساخت پایدار و نرمال است.`,
+        timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
+        is_tool_command: true
+      };
+    } else {
+      followUpMsg = {
+        id: `a-${Date.now()}`,
+        role: 'assistant',
+        content: `✅ **گام ${stepNumber} با موفقیت اجرا شد:** «${proposal.steps[stepIdx].title}»\nجهت ادامه، روی «اجرای مرحله ${stepNumber + 1}» کلیک نمایید.`,
+        timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
+        is_tool_command: true
+      };
+    }
+
+    setSessions((prev) =>
+      prev.map((s) =>
+        s.id === sessionId
+          ? {
+              ...s,
+              messages: s.messages.map((m) => (m.id === messageId ? { ...m, command_proposal: updatedProposal } : m)).concat(followUpMsg)
+            }
+          : s
+      )
+    );
+  };
+
+  const handleRejectProposal = (sessionId: string, messageId: string) => {
+    setSessions((prev) =>
+      prev.map((s) =>
+        s.id === sessionId
+          ? {
+              ...s,
+              messages: s.messages.map((m) =>
+                m.id === messageId && m.command_proposal
+                  ? { ...m, command_proposal: { ...m.command_proposal, status: 'rejected' } }
+                  : m
+              )
+            }
+          : s
+      )
+    );
+  };
+
   const handleSendMessage = async (
     sessionId: string,
     text: string,
@@ -767,32 +1090,49 @@ OCR Engine: Text detected in capture (14 labels matched).`;
       prev.map((s) => (s.id === sessionId ? { ...s, messages: [...s.messages, userMsg] } : s))
     );
 
-    // Option 2: اجرای فرامین با ابزارها (Agent & Tools Mode) or explicit tool command button
-    const shouldExecuteTools = isCommandMode || Boolean(toolCommandInfo);
+    // Simulate model inference
+    await new Promise((resolve) => setTimeout(resolve, 800));
 
+    // 💡 Human-In-The-Loop Agentic Flow:
+    // If the user request matches an IT/infrastructure command and is NOT an explicit direct tool execution button,
+    // formulate an Agent Command Proposal with Chain-of-Thought, intent interpretation, and approval options!
+    const detectedIntentTool = !toolCommandInfo ? detectToolIntent(text) : null;
+
+    if (detectedIntentTool) {
+      const userAllowedTools: string[] = currentUser?.allowed_tools !== undefined
+        ? currentUser.allowed_tools
+        : (currentUser?.role === 'SuperAdmin' 
+            ? ['t-chrome', 't-winbox', 't-wireshark', 't-nmap', 't-putty', 't-winrm', 't-hid', 't-screen', 't-terminal']
+            : currentUser?.role === 'Admin'
+            ? ['t-chrome', 't-winbox', 't-wireshark', 't-nmap', 't-putty', 't-winrm']
+            : []);
+
+      const isPermitted = userAllowedTools.includes(detectedIntentTool.toolId);
+      const proposal = generateAgentCommandProposal(detectedIntentTool, text, isPermitted, currentUser || undefined);
+
+      const assistantMsg: ChatMessage = {
+        id: `a-${Date.now()}`,
+        role: 'assistant',
+        content: `درخواست شما را به عنوان فرمان عملیاتی تفسیر کردم. با بررسی سامانه‌ها، وضعیت شبکه و APIهای موجود، برنامه اجرایی زیر را به همراه افکار و منطق فنی پیشنهاد می‌کنم:\n\n📌 **تفسیر درخواست:** ${proposal.intentSummary}\n🧠 **افکار و منطق ایجنت:** ${proposal.reasoning}\n🛠️ **سامانه هدف و بازوی اجرایی:** ${proposal.toolName} (${proposal.executionArm})\n\nلطفاً سطح مجوز و نحوه اجرای فرامین را تعیین فرمایید:`,
+        timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
+        model_used: omniRouteMeta?.useOmniRoute ? omniRouteMeta.providerName : modelId,
+        active_skills_used: skills,
+        is_tool_command: true,
+        command_proposal: proposal
+      };
+
+      setSessions((prev) =>
+        prev.map((s) => (s.id === sessionId ? { ...s, messages: [...s.messages, assistantMsg] } : s))
+      );
+      return;
+    }
+
+    // Direct tool execution (e.g. from command console or explicit confirmation)
     let detectedTool: { toolId: string; toolName: string; defaultCmd: string } | null = null;
-    if (shouldExecuteTools) {
+    if (toolCommandInfo || isCommandMode) {
       detectedTool = toolCommandInfo 
         ? { toolId: toolCommandInfo.toolId, toolName: toolCommandInfo.toolName, defaultCmd: toolCommandInfo.command }
         : detectToolIntent(text);
-
-      if (!detectedTool) {
-        // Under Agent & Tools Mode, default to appropriate execution arm based on context
-        const isAgentActive = Boolean(currentUser?.agent_connected);
-        if (text.toLowerCase().includes('web') || text.toLowerCase().includes('سایت') || text.toLowerCase().includes('مرورگر')) {
-          detectedTool = {
-            toolId: 't-chrome',
-            toolName: 'افزونه کروم (Chrome Extension Agent)',
-            defaultCmd: `chrome.tabs.query({ active: true }); // ${text}`
-          };
-        } else {
-          detectedTool = {
-            toolId: isAgentActive ? 't-winrm' : 't-terminal',
-            toolName: isAgentActive ? 'ایجنت لوکال ویندوز (WinRM / PowerShell)' : 'ترمینال سرور مرکزی (Terminal Shell)',
-            defaultCmd: text
-          };
-        }
-      }
     }
 
     // Simulate model inference
@@ -1258,20 +1598,20 @@ Try {
   };
 
   return (
-    <div className="min-h-screen bg-[#0B0B0E] text-neutral-100 flex flex-col font-sans" dir="rtl">
+    <div className="min-h-screen bg-[#18181b] text-zinc-100 flex flex-col font-sans selection:bg-sky-500/20 selection:text-sky-200" dir="rtl">
       {/* Top Header: Ultra-responsive Swiss Design */}
-      <header className="h-16 px-4 md:px-7 border-b border-neutral-800/80 bg-[#121216]/90 backdrop-blur-md sticky top-0 z-40 flex items-center justify-between shadow-sm">
+      <header className="h-14 px-4 md:px-6 border-b border-zinc-800/80 bg-[#18181b]/95 backdrop-blur-md sticky top-0 z-40 flex items-center justify-between shadow-xs shrink-0">
         {/* Brand Wordmark */}
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-700 to-blue-500 flex items-center justify-center text-white font-extrabold text-sm shadow-md shadow-blue-600/30">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-600 to-blue-600 flex items-center justify-center text-white font-extrabold text-sm shadow-md shadow-sky-600/20">
             Ω
           </div>
           <div className="flex flex-col">
-            <span className="text-sm md:text-base font-bold tracking-tight text-white leading-none">
+            <span className="text-sm font-bold tracking-tight text-white leading-none">
               OmniOps Enterprise
             </span>
-            <span className="text-[10px] text-neutral-400 font-mono hidden sm:inline mt-0.5">
-              مدیریت هوشمند زیرساخت و شبکه
+            <span className="text-[10px] text-zinc-400 font-mono hidden sm:inline mt-0.5">
+              Multi-Agent Orchestration · Swiss Minimalism
             </span>
           </div>
         </div>
@@ -1280,23 +1620,23 @@ Try {
         <nav className="hidden md:flex items-center gap-1.5">
           {/* Regular Users: ONLY access to Chatroom */}
           {currentUser?.role === 'User' ? (
-            <div className="flex items-center gap-2 px-3.5 py-1.5 bg-blue-950/20 border border-blue-500/25 rounded-xl text-xs text-neutral-300">
+            <div className="flex items-center gap-2 px-3 py-1 bg-zinc-800/80 border border-zinc-700/60 rounded-xl text-xs text-zinc-300">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <span className="font-semibold text-white">چت‌روم هوشمند سازمانی</span>
-              <span className="text-[10px] text-blue-300 font-mono">ایزوله کاربری</span>
+              <span className="text-[10px] text-sky-400 font-mono">ایزوله کاربری</span>
             </div>
           ) : (
             <>
               {/* 1. Chatrooms (Available to all) */}
               <button
                 onClick={() => setActiveTab('chat')}
-                className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 ${
+                className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-all flex items-center gap-1.5 ${
                   activeTab === 'chat'
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
-                    : 'text-neutral-400 hover:text-white hover:bg-neutral-800/60'
+                    ? 'bg-zinc-800 text-white border border-zinc-700/80 shadow-xs'
+                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
                 }`}
               >
-                <MessageSquare className="w-3.5 h-3.5" />
+                <MessageSquare className="w-3.5 h-3.5 text-sky-400" />
                 <span>چت‌روم‌ها</span>
               </button>
 
@@ -1304,10 +1644,10 @@ Try {
               {(currentUser?.role === 'SuperAdmin' || currentUser?.role === 'Admin') && (
                 <button
                   onClick={() => setActiveTab('tools')}
-                  className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-all flex items-center gap-1.5 ${
                     activeTab === 'tools'
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
-                      : 'text-neutral-400 hover:text-white hover:bg-neutral-800/60'
+                      ? 'bg-zinc-800 text-white border border-zinc-700/80 shadow-xs'
+                      : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
                   }`}
                 >
                   <BookOpen className="w-3.5 h-3.5" />
@@ -1322,14 +1662,14 @@ Try {
               {currentUser?.role === 'SuperAdmin' && (
                 <button
                   onClick={() => setActiveTab('server_infra')}
-                  className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-all flex items-center gap-1.5 ${
                     activeTab === 'server_infra'
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
-                      : 'text-neutral-400 hover:text-white hover:bg-neutral-800/60'
+                      ? 'bg-zinc-800 text-white border border-zinc-700/80 shadow-xs'
+                      : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
                   }`}
                 >
-                  <Server className="w-3.5 h-3.5 text-blue-400" />
-                  <span>فرماندهی و زیرساخت سرور</span>
+                  <Server className="w-3.5 h-3.5 text-sky-400" />
+                  <span>فرماندهی سرور</span>
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 </button>
               )}
@@ -1338,13 +1678,13 @@ Try {
               {(currentUser?.role === 'SuperAdmin' || currentUser?.role === 'Admin') && (
                 <button
                   onClick={() => setActiveTab('settings')}
-                  className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-all flex items-center gap-1.5 ${
                     activeTab === 'settings'
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
-                      : 'text-neutral-400 hover:text-white hover:bg-neutral-800/60'
+                      ? 'bg-zinc-800 text-white border border-zinc-700/80 shadow-xs'
+                      : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
                   }`}
                 >
-                  <Settings className="w-3.5 h-3.5" />
+                  <Settings className="w-3.5 h-3.5 text-zinc-300" />
                   <span>تنظیمات و API</span>
                 </button>
               )}
@@ -1353,13 +1693,13 @@ Try {
               {currentUser?.role === 'SuperAdmin' && (
                 <button
                   onClick={() => setActiveTab('auth')}
-                  className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-all flex items-center gap-1.5 ${
                     activeTab === 'auth'
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
-                      : 'text-neutral-400 hover:text-white hover:bg-neutral-800/60'
+                      ? 'bg-zinc-800 text-white border border-zinc-700/80 shadow-xs'
+                      : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
                   }`}
                 >
-                  <Shield className="w-3.5 h-3.5" />
+                  <Shield className="w-3.5 h-3.5 text-zinc-300" />
                   <span>کاربران و امنیت</span>
                 </button>
               )}
@@ -1369,23 +1709,6 @@ Try {
 
         {/* Right Status & Profile */}
         <div className="flex items-center gap-3">
-          {proxyConfig.enabled && (
-            <div className="hidden lg:flex items-center gap-1.5 text-xs text-neutral-400 pl-3 border-l border-neutral-800 font-mono">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>SOCKS5 :1080</span>
-            </div>
-          )}
-
-          {/* Quick Theme Toggle (Dark High-Contrast / Neutral Light WCAG) */}
-          <button
-            type="button"
-            onClick={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
-            className="p-1.5 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-800/80 transition-colors border border-neutral-800/60"
-            title={theme === 'dark' ? 'سوئیچ به تم روشن و خنثی (Accessibility WCAG)' : 'سوئیچ به تم تیره با کنتراست بالا'}
-          >
-            {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-blue-400" />}
-          </button>
-
           {currentUser ? (
             <div
               onClick={() => setIsProfileModalOpen(true)}
@@ -1521,7 +1844,7 @@ Try {
       )}
 
       {/* Main Viewport Content */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-3.5 sm:p-5 md:p-6">
+      <main className={`flex-1 w-full ${activeTab === 'chat' ? 'p-0 max-w-full flex flex-col min-h-0 overflow-hidden' : 'max-w-7xl mx-auto p-3.5 sm:p-5 md:p-6'}`}>
         {activeTab === 'chat' && currentUser && (
           <ChatModule
             currentUser={currentUser}
@@ -1543,6 +1866,9 @@ Try {
             onDeleteSession={handleDeleteSession}
             projectRules={projectRules}
             mcpServers={mcpServers}
+            onApproveProposal={handleApproveProposal}
+            onExecuteProposalStep={handleExecuteProposalStep}
+            onRejectProposal={handleRejectProposal}
             onOpenMcpRulesModal={(tab) => {
               setIsMcpRulesModalOpen(true);
             }}
@@ -1613,18 +1939,25 @@ Try {
         )}
       </main>
 
-      {/* Role Profile & Persona Switcher Modal */}
+      {/* Role Profile & Persona Switcher Slide-Over Drawer (Zero Popups) */}
       {isProfileModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-[#141419] border border-neutral-700/80 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+        <div 
+          onClick={() => setIsProfileModalOpen(false)}
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex justify-start animate-in fade-in duration-150"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#18181b] border-r border-zinc-800 w-full max-w-md h-full p-6 shadow-2xl space-y-5 animate-in slide-in-from-left duration-200 overflow-y-auto text-right"
+            dir="rtl"
+          >
+            {/* Drawer Header */}
+            <div className="flex items-center justify-between pb-3.5 border-b border-zinc-800">
               <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm ${
                   currentUser?.role === 'SuperAdmin'
                     ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                     : currentUser?.role === 'Admin'
-                    ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                    ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
                     : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                 }`}>
                   {currentUser?.username ? currentUser.username[0].toUpperCase() : 'U'}
@@ -1636,26 +1969,26 @@ Try {
                       currentUser?.role === 'SuperAdmin'
                         ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                         : currentUser?.role === 'Admin'
-                        ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                        ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
                         : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                     }`}>
                       {currentUser?.role}
                     </span>
                   </h3>
-                  <span className="text-xs text-neutral-400 font-mono">@{currentUser?.username} · {currentUser?.email}</span>
+                  <span className="text-xs text-zinc-400 font-mono">@{currentUser?.username} · {currentUser?.email}</span>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsProfileModalOpen(false)}
-                className="text-neutral-400 hover:text-white p-1 rounded-lg"
+                className="text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-zinc-800 transition-colors"
               >
                 ✕
               </button>
             </div>
 
             {/* Profile Permissions & Layout Details */}
-            <div className="bg-[#101014] border border-neutral-800/80 rounded-xl p-4 space-y-2.5">
+            <div className="bg-[#27272a]/70 border border-zinc-700/60 rounded-2xl p-4 space-y-2.5 backdrop-blur-md">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-neutral-400">قالب فعال صفحه:</span>
                 <span className="text-white font-semibold">
