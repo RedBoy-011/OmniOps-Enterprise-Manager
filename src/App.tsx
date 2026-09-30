@@ -53,6 +53,11 @@ export default function App() {
   const [agentRunning, setAgentRunning] = useState<boolean>(true);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
+  // Raw Installation & Setup State
+  const [isInstalled, setIsInstalled] = useState<boolean>(() => {
+    return localStorage.getItem('omniops_is_installed') === 'true';
+  });
+
   // Accessibility & Theme State ('dark' high-contrast default | 'light' neutral WCAG AA)
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('omniops_theme') as 'dark' | 'light') || 'dark';
@@ -340,13 +345,7 @@ export default function App() {
 
   // Enterprise Skills Registry (Domain Knowledge & Directives)
   const [skillsList, setSkillsList] = useState<SkillItem[]>(ENTERPRISE_SKILLS);
-  const [activeSkillIds, setActiveSkillIds] = useState<string[]>([
-    'mikrotik_expert',
-    'powershell_enterprise',
-    'devops_docker_k8s',
-    'plugin_context7',
-    'plugin_strix'
-  ]);
+  const [activeSkillIds, setActiveSkillIds] = useState<string[]>([]);
 
   const handleAddSkill = (newSkill: SkillItem) => {
     setSkillsList((prev) => [newSkill, ...prev]);
@@ -356,47 +355,18 @@ export default function App() {
   // Prefilled prompt transition from Skills view to Chat view
   const [prefilledPrompt, setPrefilledPrompt] = useState<{ text: string; skillId: string } | null>(null);
 
-  // Chat sessions state
+  // Chat sessions state (Pristine raw state with zero chat history)
   const [sessions, setSessions] = useState<ChatSession[]>([
     {
-      id: 'session-default-1',
-      title: 'کانفیگ و عیب‌یابی فایروال میکروتیک و شبکه',
+      id: 'session-1',
+      title: 'مکالمه جدید',
       selected_model: 'gemini-2.5-flash',
-      active_skills: ['mikrotik_expert', 'powershell_enterprise'],
-      created_at: '2026-09-26 10:00',
-      messages: [
-        {
-          id: 'm1',
-          role: 'user',
-          content: 'چگونه می‌توانم در RouterOS v7 قوانین FastTrack را به گونه‌ای بنویسم که با مانگل‌های تفکیک ترافیک (PCC) تداخل نداشته باشد؟',
-          timestamp: '10:00'
-        },
-        {
-          id: 'm2',
-          role: 'assistant',
-          content: `بر اساس اصول معماری و روتینگ پیشرفته MikroTik RouterOS v7، قاعده کلیدی در همزیستی FastTrack و Mangle بدین شرح است:
-
-1. **علت تداخل**: FastTrack بسته‌های بعدی یک Connection برقرار شده را از پردازش کامل فایروال و مانگل دور می‌زند (Bypass می‌کند)، بنابراین اگر بسته‌ای FastTrack شود، قوانین Mangle برای پکت‌های بعدی آن اجرا نخواهد شد.
-
-2. **راهکار استاندارد معماری**:
-برای ترافیکی که می‌خواهید تفکیک بار (PCC) یا نشانی‌گذاری روتینگ (routing-mark) شود، باید در بخش FastTrack یک استثنا با \`connection-mark\` قائل شوید:
-
-\`\`\`routeros
-# ۱. قانون استثنا برای ترافیک نشان‌دار شده در Filter Rules
-/ip firewall filter
-add chain=forward action=fasttrack-connection connection-state=established,related connection-mark=no-mark comment="FastTrack Only Unmarked Traffic"
-add chain=forward action=accept connection-state=established,related comment="Accept established/related for all"
-\`\`\`
-
-با این پیکربندی، ترافیک عمومی شبکه از شتاب پردازشی FastTrack حداکثر استفاده را برده و ترافیک نیازمند PCC بدون افت کیفیت به مسیر مربوطه هدایت می‌شود.`,
-          timestamp: '10:01',
-          model_used: 'gemini-2.5-flash',
-          active_skills_used: ['mikrotik_expert']
-        }
-      ]
+      active_skills: [],
+      created_at: new Date().toLocaleDateString('fa-IR'),
+      messages: []
     }
   ]);
-  const [currentSessionId, setCurrentSessionId] = useState<string>('session-default-1');
+  const [currentSessionId, setCurrentSessionId] = useState<string>('session-1');
 
   // Periodic Health Check Simulation (Cron)
   useEffect(() => {
@@ -1596,6 +1566,78 @@ Try {
       return filtered;
     });
   };
+
+  if (!isInstalled) {
+    return (
+      <div className="min-h-screen bg-[#18181b] text-zinc-100 flex items-center justify-center p-4 font-sans selection:bg-sky-500/20 selection:text-sky-200" dir="rtl">
+        <div className="w-full max-w-xl bg-[#202024] border border-zinc-800 rounded-3xl p-8 shadow-2xl space-y-6">
+          <div className="flex items-center gap-3 pb-4 border-b border-zinc-800">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-sky-600 to-blue-600 flex items-center justify-center text-white font-extrabold text-xl shadow-lg shadow-sky-600/30">
+              Ω
+            </div>
+            <div>
+              <h1 className="text-lg font-extrabold text-white">راه‌اندازی اولیه و نصب سامانه OmniOps Enterprise Manager</h1>
+              <p className="text-xs text-zinc-400 font-mono mt-0.5">CLI Setup & Smart Core/Kernel Installation Wizard</p>
+            </div>
+          </div>
+
+          <div className="space-y-4 text-xs text-zinc-300">
+            <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-2xl text-blue-300 leading-relaxed">
+              <b>وضعیت سرور (Raw State):</b> پس از ساخت نام کاربری و رمز عبور ادمین در محیط CLI، با کلیک روی دکمه زیر فرایند <b>راه‌اندازی هوشمند کامل هسته، کرنل و پیش‌نیازها</b> اجرا شده و پنل وب بدون هیچ‌گونه سابقه قبلی آماده بهره‌برداری می‌شود.
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-zinc-400 font-medium block">نام کاربری ادمین (CLI Setup):</label>
+                <input 
+                  type="text" 
+                  defaultValue="superadmin" 
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#18181b] border border-zinc-700 text-white font-mono text-xs focus:outline-none focus:border-sky-500"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-zinc-400 font-medium block">رمز عبور ادمین (CLI Setup):</label>
+                <input 
+                  type="password" 
+                  defaultValue="••••••••••••" 
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#18181b] border border-zinc-700 text-white font-mono text-xs focus:outline-none focus:border-sky-500"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-zinc-400 font-medium block">هاست سرور و پورت لبه (Edge Gateway):</label>
+              <input 
+                type="text" 
+                defaultValue="http://localhost:8443 (OmniRouter port 20128)" 
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[#18181b] border border-zinc-700 text-zinc-300 font-mono text-xs focus:outline-none"
+                readOnly
+              />
+            </div>
+
+            <div className="bg-[#141417] border border-zinc-800 rounded-xl p-3 font-mono text-[11px] text-emerald-400 space-y-1">
+              <div>$ python3 api_manager.py --init-core --fresh-install</div>
+              <div className="text-zinc-400">⚡ Check prerequisites: Flask, Drizzle, OmniRouter proxy, Multi-Agent topology... [Ready]</div>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-zinc-800 flex items-center justify-between">
+            <span className="text-[11px] text-zinc-500 font-mono">بدون سابقه چت · ورود به پنل پاک و عملیاتی</span>
+            <button
+              type="button"
+              onClick={() => {
+                localStorage.setItem('omniops_is_installed', 'true');
+                setIsInstalled(true);
+              }}
+              className="px-6 py-3 rounded-2xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-sky-600/30 transition-all flex items-center gap-2 cursor-pointer"
+            >
+              <span>🚀 شروع فرایند نصب و راه‌اندازی هوشمند هسته</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#18181b] text-zinc-100 flex flex-col font-sans selection:bg-sky-500/20 selection:text-sky-200" dir="rtl">
