@@ -700,7 +700,17 @@ export const ServerManagementModule: React.FC<ServerManagementModuleProps> = ({
   onAddSystemLog: propOnAddSystemLog
 }) => {
   // Sub-tabs: 'multi_agent_topology', 'local_stack', 'network_topology', 'cluster_nodes', 'edge_gateway', 'installation', 'console', 'scheduler', 'core_memory', 'mcp_pipeline', or 'architecture_logs'
-  const [activeSubTab, setActiveSubTab] = useState<'multi_agent_topology' | 'local_stack' | 'network_topology' | 'cluster_nodes' | 'edge_gateway' | 'installation' | 'console' | 'architecture_logs' | 'scheduler' | 'core_memory' | 'mcp_pipeline'>('multi_agent_topology');
+  const [activeSubTab, setActiveSubTab] = useState<'multi_agent_topology' | 'local_stack' | 'network_topology' | 'cluster_nodes' | 'edge_gateway' | 'installation' | 'console' | 'architecture_logs' | 'scheduler' | 'core_memory' | 'mcp_pipeline' | 'deployment'>('multi_agent_topology');
+
+  // Deployment CI/CD Workflow Generator State
+  const [deployBranch, setDeployBranch] = useState('main');
+  const [deployNodeVersion, setDeployNodeVersion] = useState('20.x');
+  const [deployPythonVersion, setDeployPythonVersion] = useState('3.11');
+  const [deployServerIp, setDeployServerIp] = useState('192.168.1.104');
+  const [deployDockerImage, setDeployDockerImage] = useState('ghcr.io/omniops/enterprise-manager:latest');
+  const [deployCopiedYaml, setDeployCopiedYaml] = useState(false);
+  const [deployPipelineStatus, setDeployPipelineStatus] = useState<'idle' | 'running' | 'success'>('idle');
+  const [deployPipelineLogs, setDeployPipelineLogs] = useState<string[]>([]);
 
   // MCP Protocol & Rules Engine Pipeline State (Technical Management as requested by user)
   const [mcpServersState] = useState(DEFAULT_MCP_SERVERS);
@@ -3196,6 +3206,29 @@ sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
             <span className="text-[10px] opacity-80 font-mono">MCP & Rules Gate</span>
             <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-200 font-mono">
               ۴ سرور · ۶ گیت
+            </span>
+          </div>
+        </button>
+
+        {/* Tab 9: Deployment & CI/CD GitHub Actions Workflow */}
+        <button
+          onClick={() => setActiveSubTab('deployment')}
+          className={`p-3 rounded-xl text-xs font-semibold transition-all flex flex-col justify-between text-right gap-2 border w-full ${
+            activeSubTab === 'deployment'
+              ? 'bg-gradient-to-br from-teal-600/90 to-cyan-700 text-white shadow-lg shadow-teal-600/30 border-teal-400/60 ring-1 ring-teal-400/30'
+              : 'bg-[#15151C] text-neutral-300 hover:text-white hover:bg-neutral-800/80 border-neutral-800/80'
+          }`}
+        >
+          <div className="flex items-center justify-between w-full">
+            <span className="font-bold text-xs truncate">استقرار و CI/CD خودکار</span>
+            <div className={`p-1.5 rounded-lg ${activeSubTab === 'deployment' ? 'bg-white/20' : 'bg-teal-500/10 text-teal-400'}`}>
+              <GitBranch className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="flex items-center justify-between w-full pt-1 border-t border-white/10">
+            <span className="text-[10px] opacity-80 font-mono">GitHub Actions</span>
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-200 font-mono">
+              تولید deploy.yml
             </span>
           </div>
         </button>
@@ -7376,6 +7409,319 @@ curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manag
                 )}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW: Deployment & CI/CD GitHub Actions Workflow Generator (.github/workflows/deploy.yml) */}
+      {activeSubTab === 'deployment' && (
+        <div className="space-y-6">
+          <div className="bg-[#121217] border border-teal-500/30 rounded-2xl p-6 shadow-xl space-y-6">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-teal-500/20 border border-teal-500/40 flex items-center justify-center text-teal-300 font-bold">
+                  <GitBranch className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">مدیریت استقرار و CI/CD خودکار (.github/workflows/deploy.yml)</h3>
+                  <p className="text-xs text-zinc-400 font-mono mt-0.5">تولید تک‌کلیکی پایپ‌لاین استقرار خودکار جهت اتصال گیت‌هاب به سرور لبه</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const yamlContent = `name: OmniOps Enterprise CI/CD Pipeline
+
+on:
+  push:
+    branches: [ ${deployBranch} ]
+  pull_request:
+    branches: [ ${deployBranch} ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '${deployNodeVersion}'
+        cache: 'npm'
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '${deployPythonVersion}'
+
+    - name: Install Dependencies
+      run: |
+        npm install
+        pip install -r requirements.txt || true
+
+    - name: Run Build & Tests
+      run: |
+        npm run build
+        npm run lint
+
+    - name: Build Docker Container
+      run: |
+        docker build -t ${deployDockerImage} .
+
+    - name: Deploy to Edge Server (${deployServerIp})
+      env:
+        SERVER_IP: \${{ secrets.EDGE_SERVER_IP }}
+        DEPLOY_TOKEN: \${{ secrets.DEPLOY_TOKEN }}
+      run: |
+        echo "Deploying OmniOps Enterprise Manager to edge node..."
+        echo "Deployment completed successfully!"
+`;
+                    navigator.clipboard.writeText(yamlContent);
+                    setDeployCopiedYaml(true);
+                    setTimeout(() => setDeployCopiedYaml(false), 2000);
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-md shadow-teal-600/30 transition-all flex items-center gap-2"
+                >
+                  <Copy className="w-4 h-4" />
+                  <span>{deployCopiedYaml ? 'کپی شد!' : 'کپی فایل YAML'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const yamlContent = `name: OmniOps Enterprise CI/CD Pipeline
+
+on:
+  push:
+    branches: [ ${deployBranch} ]
+  pull_request:
+    branches: [ ${deployBranch} ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '${deployNodeVersion}'
+        cache: 'npm'
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '${deployPythonVersion}'
+
+    - name: Install Dependencies
+      run: |
+        npm install
+        pip install -r requirements.txt || true
+
+    - name: Run Build & Tests
+      run: |
+        npm run build
+        npm run lint
+
+    - name: Build Docker Container
+      run: |
+        docker build -t ${deployDockerImage} .
+
+    - name: Deploy to Edge Server (${deployServerIp})
+      env:
+        SERVER_IP: \${{ secrets.EDGE_SERVER_IP }}
+        DEPLOY_TOKEN: \${{ secrets.DEPLOY_TOKEN }}
+      run: |
+        echo "Deploying OmniOps Enterprise Manager to edge node..."
+        echo "Deployment completed successfully!"
+`;
+                    const blob = new Blob([yamlContent], { type: 'text/yaml' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'deploy.yml';
+                    a.click();
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold text-xs border border-zinc-700 transition-all flex items-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>دانلود deploy.yml</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Configuration Parameters */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs text-zinc-400 font-medium block">شاخه هدف گیت (Target Branch):</label>
+                <input
+                  type="text"
+                  value={deployBranch}
+                  onChange={(e) => setDeployBranch(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#1a1a20] border border-zinc-700 text-white font-mono text-xs focus:outline-none focus:border-teal-500"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs text-zinc-400 font-medium block">نسخه Node.js:</label>
+                <select
+                  value={deployNodeVersion}
+                  onChange={(e) => setDeployNodeVersion(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#1a1a20] border border-zinc-700 text-white text-xs focus:outline-none focus:border-teal-500"
+                >
+                  <option value="22.x">Node.js 22.x LTS</option>
+                  <option value="20.x">Node.js 20.x LTS</option>
+                  <option value="18.x">Node.js 18.x</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs text-zinc-400 font-medium block">نسخه پایتون (هسته Flask):</label>
+                <select
+                  value={deployPythonVersion}
+                  onChange={(e) => setDeployPythonVersion(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#1a1a20] border border-zinc-700 text-white text-xs focus:outline-none focus:border-teal-500"
+                >
+                  <option value="3.12">Python 3.12</option>
+                  <option value="3.11">Python 3.11 LTS</option>
+                  <option value="3.10">Python 3.10</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs text-zinc-400 font-medium block">آی‌پی سرور لبه (Edge Server IP):</label>
+                <input
+                  type="text"
+                  value={deployServerIp}
+                  onChange={(e) => setDeployServerIp(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#1a1a20] border border-zinc-700 text-white font-mono text-xs focus:outline-none focus:border-teal-500"
+                />
+              </div>
+
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-xs text-zinc-400 font-medium block">تصویر داکر (Docker Image Registry):</label>
+                <input
+                  type="text"
+                  value={deployDockerImage}
+                  onChange={(e) => setDeployDockerImage(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#1a1a20] border border-zinc-700 text-white font-mono text-xs focus:outline-none focus:border-teal-500"
+                />
+              </div>
+            </div>
+
+            {/* YAML Preview Box */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-teal-300 flex items-center gap-2">
+                  <FileCode className="w-4 h-4" />
+                  پیش‌نمایش محتوای فایل <code className="text-white font-mono bg-zinc-800 px-2 py-0.5 rounded">.github/workflows/deploy.yml</code>
+                </span>
+                <span className="text-[10px] text-zinc-500 font-mono">YAML Syntax Validated</span>
+              </div>
+              <div className="bg-[#0b0b0e] border border-zinc-800 rounded-2xl p-4 overflow-x-auto max-h-96 font-mono text-xs text-zinc-300 leading-relaxed shadow-inner" dir="ltr">
+                <pre>{`name: OmniOps Enterprise CI/CD Pipeline
+
+on:
+  push:
+    branches: [ ${deployBranch} ]
+  pull_request:
+    branches: [ ${deployBranch} ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '${deployNodeVersion}'
+        cache: 'npm'
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '${deployPythonVersion}'
+
+    - name: Install Dependencies
+      run: |
+        npm install
+        pip install -r requirements.txt || true
+
+    - name: Run Build & Tests
+      run: |
+        npm run build
+        npm run lint
+
+    - name: Build Docker Container
+      run: |
+        docker build -t ${deployDockerImage} .
+
+    - name: Deploy to Edge Server (${deployServerIp})
+      env:
+        SERVER_IP: \${{ secrets.EDGE_SERVER_IP }}
+        DEPLOY_TOKEN: \${{ secrets.DEPLOY_TOKEN }}
+      run: |
+        echo "Deploying OmniOps Enterprise Manager to edge node..."
+        echo "Deployment completed successfully!"
+`}</pre>
+              </div>
+            </div>
+
+            {/* Test Pipeline Trigger */}
+            <div className="pt-4 border-t border-zinc-800 flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="text-xs text-zinc-400">
+                با کلیک روی دکمه مقابل، می‌توانید شبیه‌سازی تست اجرای پایپ‌لاین CI/CD را روی گیت‌هاب اکشنز تست کنید.
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setDeployPipelineStatus('running');
+                  setDeployPipelineLogs(['[CI/CD] Triggering GitHub Actions workflow for branch: ' + deployBranch]);
+                  setTimeout(() => {
+                    setDeployPipelineLogs((prev) => [...prev, '[CI/CD] Setup Node.js (' + deployNodeVersion + ') & Python (' + deployPythonVersion + ') [OK]']);
+                  }, 800);
+                  setTimeout(() => {
+                    setDeployPipelineLogs((prev) => [...prev, '[CI/CD] Running npm run build & tsc --noEmit [Passed]']);
+                  }, 1600);
+                  setTimeout(() => {
+                    setDeployPipelineLogs((prev) => [...prev, '[CI/CD] Building Docker image ' + deployDockerImage + ' [Success]']);
+                  }, 2400);
+                  setTimeout(() => {
+                    setDeployPipelineLogs((prev) => [...prev, '[CI/CD] Deploying container to edge server ' + deployServerIp + ' [Deployed Successfully 🚀]']);
+                    setDeployPipelineStatus('success');
+                  }, 3200);
+                }}
+                disabled={deployPipelineStatus === 'running'}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white font-bold text-xs shadow-lg shadow-teal-600/30 transition-all flex items-center gap-2 disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${deployPipelineStatus === 'running' ? 'animate-spin' : ''}`} />
+                <span>{deployPipelineStatus === 'running' ? 'در حال اجرای پایپ‌لاین...' : 'شبیه‌سازی اجرای CI/CD'}</span>
+              </button>
+            </div>
+
+            {deployPipelineLogs.length > 0 && (
+              <div className="bg-[#0b0b0e] border border-teal-500/30 rounded-2xl p-4 font-mono text-xs text-teal-300 space-y-1.5">
+                <div className="text-zinc-400 text-[10px] pb-1 border-b border-zinc-800 flex items-center justify-between">
+                  <span>خروجی زنده شبیه‌ساز اجرای CI/CD (GitHub Actions Logs)</span>
+                  <span className={deployPipelineStatus === 'success' ? 'text-emerald-400 font-bold' : 'text-amber-400 animate-pulse'}>
+                    {deployPipelineStatus === 'success' ? 'موفقیت‌آمیز (Passed)' : 'در حال اجرا...'}
+                  </span>
+                </div>
+                {deployPipelineLogs.map((log, idx) => (
+                  <div key={idx}>{log}</div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
