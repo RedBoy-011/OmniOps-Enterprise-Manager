@@ -1,206 +1,410 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# OmniOps Enterprise Manager - Edge UI Mirror & Gateway Bootstrap Installer
-# Zero-Trust WireGuard Tunneling | Caddy Automated SSL | Python Interactive TUI
-# Official Repository: https://github.com/RedBoy-011/OmniOps-Enterprise-Manager
+# OmniOps Enterprise Manager - Modern Edge Node Installer (Ferrum-Grade CLI)
 # ==============================================================================
+# In script baraye nasb va rahandaziye sarvare Edge Node ba ghabeliate Auto-IP,
+# modiriate hooshmande SSL (Domain/IP) va Token Handshake ba Master Node ast.
+# Hameye comment-haye in code be darkhaste karbar be zabane Finglish neveshte shodeand.
+# ==============================================================================
+
 set -e
 
-COLOR_CYAN='\033[0;36m'
-COLOR_GREEN='\033[0;32m'
-COLOR_YELLOW='\033[1;33m'
-COLOR_RED='\033[0;31m'
-COLOR_RESET='\033[0m'
-COLOR_BOLD='\033[1m'
+# ------------------------------------------------------------------------------
+# 1. Tanzimate Rangha va Namayeshe Graphic (ANSI Colors & Styling)
+# ------------------------------------------------------------------------------
+COLOR_RESET="\033[0m"
+COLOR_BOLD="\033[1m"
+COLOR_CYAN="\033[0;36m"
+COLOR_GREEN="\033[0;32m"
+COLOR_YELLOW="\033[1;33m"
+COLOR_RED="\033[0;31m"
+COLOR_BLUE="\033[0;34m"
+COLOR_PURPLE="\033[0;35m"
+COLOR_GRAY="\033[0;90m"
 
-echo -e "${COLOR_CYAN}===============================================================================${COLOR_RESET}"
-echo -e "${COLOR_GREEN}${COLOR_BOLD}  🛡️  OmniOps Enterprise - Edge UI Mirror & Gateway Bootstrap Installer       ${COLOR_RESET}"
-echo -e "${COLOR_CYAN}===============================================================================${COLOR_RESET}"
-echo -e "${COLOR_YELLOW}[*] معماری نود لبه: ارتباط Zero-Trust با WireGuard و مدیریت خودکار SSL با Caddy${COLOR_RESET}"
-echo -e "${COLOR_YELLOW}[*] مخزن رسمی: https://github.com/RedBoy-011/OmniOps-Enterprise-Manager${COLOR_RESET}"
-echo ""
+# Tabee baraye pak kardane safhe va namayeshe Banner
+show_banner() {
+    clear
+    echo -e "${COLOR_CYAN}${COLOR_BOLD}"
+    cat << "EOF"
+  ██████╗ ███╗   ███╗███╗   ██╗██╗ ██████╗ ██████╗ ███████╗
+ ██╔═══██╗████╗ ████║████╗  ██║██║██╔═══██╗██╔══██╗██╔════╝
+ ██║   ██║██╔████╔██║██╔██╗ ██║██║██║   ██║██████╔╝███████╗
+ ██║   ██║██║╚██╔╝██║██║╚██╗██║██║██║   ██║██╔═══╝ ╚════██║
+ ╚██████╔╝██║ ╚═╝ ██║██║ ╚████║██║╚██████╔╝██║     ███████║
+  ╚═════╝ ╚═╝     ╚═╝╚═╝  ╚═══╝╚═╝ ╚═════╝ ╚═╝     ╚══════╝
+EOF
+    echo -e "${COLOR_PURPLE}  --- Modern Edge Mirror & Secure Reverse Proxy Installer ---${COLOR_RESET}"
+    echo -e "${COLOR_GRAY}  Version: 2.4.0-Enterprise | Architecture: Zero-Trust Gateway${COLOR_RESET}"
+    echo -e "${COLOR_CYAN}===============================================================================${COLOR_RESET}\n"
+}
 
-# 1. Root Check
+# Tabee baraye namayeshe Spinner hengame anjame amaliate toolani dar pas-zamine
+run_with_spinner() {
+    local pid=$!
+    local delay=0.08
+    local spinstr='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+    local message="$1"
+    tput civis 2>/dev/null || true
+    while kill -0 "$pid" 2>/dev/null; do
+        local temp=${spinstr#?}
+        printf "\r  ${COLOR_CYAN}%c${COLOR_RESET} %s..." "$spinstr" "$message"
+        spinstr=$temp${spinstr%"$temp"}
+        sleep $delay
+    done
+    wait "$pid"
+    local exit_code=$?
+    tput cnorm 2>/dev/null || true
+    if [ $exit_code -eq 0 ]; then
+        printf "\r  ${COLOR_GREEN}✓${COLOR_RESET} %-55s ${COLOR_GREEN}[OK]${COLOR_RESET}\n" "$message"
+    else
+        printf "\r  ${COLOR_RED}✗${COLOR_RESET} %-55s ${COLOR_RED}[FAILED]${COLOR_RESET}\n" "$message"
+        return $exit_code
+    fi
+}
+
+# ------------------------------------------------------------------------------
+# 2. Check kardane Dastresi Root (Root Permission Verification)
+# ------------------------------------------------------------------------------
+# Barresi mikonim ke aya karbar dastresie root ya sudo darad ya kheyr
 if [ "$(id -u)" -ne 0 ]; then
-    echo -e "${COLOR_RED}[!] خطای دسترسی: لطفاً این اسکریپت را با دسترسی root یا sudo اجرا کنید.${COLOR_RESET}" >&2
+    echo -e "${COLOR_RED}[!] Error: Lotfan in script ra ba dastresie root ya sudo ejra konid.${COLOR_RESET}"
+    echo -e "    Mesal: ${COLOR_CYAN}sudo bash $0${COLOR_RESET}"
     exit 1
 fi
 
-# 2. Check Python 3 & pip/venv
-echo -e "${COLOR_CYAN}[1/3] بررسی پیش‌نیازهای محیط پایتون...${COLOR_RESET}"
-if ! command -v python3 >/dev/null 2>&1; then
-    echo -e "${COLOR_YELLOW}[*] پایتون ۳ یافت نشد. در حال نصب پایتون و ابزارهای سیستمی...${COLOR_RESET}"
-    export DEBIAN_FRONTEND=noninteractive
-    apt-get update -qq
-    apt-get install -y -qq python3 python3-pip python3-venv python3-rich curl wget ca-certificates >/dev/null 2>&1
+show_banner
+
+# ------------------------------------------------------------------------------
+# STEP 1: Tashkhise Khodkare IP (Auto-IP Detection Engine)
+# ------------------------------------------------------------------------------
+# Dar in ghesmat IP haye mahali (LAN) va omoumi (Public) ba chand ravesh shenasaei mishavand
+echo -e "${COLOR_BOLD}${COLOR_BLUE}[STEP 1/5]${COLOR_RESET} ${COLOR_BOLD}Tashkhise Khodkare IP va Moshakhassate Shabake...${COLOR_RESET}"
+
+# Shenasaeiye Local LAN IP
+DETECTED_LOCAL_IP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{print $7}' || hostname -I 2>/dev/null | awk '{print $1}' || echo "127.0.0.1")
+
+# Shenasaeiye Public IP ba timeout kootah baraye jelogiri az hang kardan dar shabakehaye mahali
+DETECTED_PUBLIC_IP=$(curl -s -m 2 https://api.ipify.org 2>/dev/null || curl -s -m 2 https://icanhazip.com 2>/dev/null || curl -s -m 2 https://ip.sb 2>/dev/null || echo "")
+
+# Agar pasokh dorost nabood ya HTML bood pak mikonim
+if [[ "$DETECTED_PUBLIC_IP" =~ "<" ]] || [ -z "$DETECTED_PUBLIC_IP" ]; then
+    DETECTED_PUBLIC_IP=""
 fi
 
-# 3. Setup temporary isolated workspace for Python TUI
-WORKDIR="/tmp/omniops-edge-bootstrap"
-mkdir -p "$WORKDIR"
-cd "$WORKDIR"
-
-echo -e "${COLOR_CYAN}[2/3] آماده‌سازی محیط تعاملی گرافیکی (Python Rich TUI)...${COLOR_RESET}"
-# Try system rich or create lightweight venv
-if ! python3 -c "import rich" >/dev/null 2>&1; then
-    echo -e "${COLOR_YELLOW}[*] در حال نصب بسته‌های بهینه‌ساز رابط کاربری CLI...${COLOR_RESET}"
-    # Use pip with break-system-packages or venv
-    pip3 install --default-timeout=120 -i https://mirrors.aliyun.com/pypi/simple/ rich --break-system-packages --quiet 2>/dev/null || \
-    pip3 install rich --break-system-packages --quiet 2>/dev/null || \
-    pip3 install rich --quiet 2>/dev/null || \
-    (python3 -m venv --system-site-packages "$WORKDIR/venv" && "$WORKDIR/venv/bin/pip" install --default-timeout=120 -i https://mirrors.aliyun.com/pypi/simple/ rich --quiet) || true
-fi
-
-PYTHON_BIN="python3"
-if [ -f "$WORKDIR/venv/bin/python" ]; then
-    PYTHON_BIN="$WORKDIR/venv/bin/python"
-fi
-
-# 4. Fetch latest edge installer CLI from GitHub repository or use local if present
-CLI_SCRIPT="$WORKDIR/edge_installer_cli.py"
-REPO_RAW_URL="https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/deployment/edge_installer_cli.py"
-
-if [ -f "/deployment/edge_installer_cli.py" ]; then
-    cp "/deployment/edge_installer_cli.py" "$CLI_SCRIPT"
-elif [ -f "./deployment/edge_installer_cli.py" ]; then
-    cp "./deployment/edge_installer_cli.py" "$CLI_SCRIPT"
+echo -e "  ${COLOR_GRAY}┌─────────────────────────────────────────────────────────────┐${COLOR_RESET}"
+echo -e "  ${COLOR_GRAY}│${COLOR_RESET} ${COLOR_CYAN}IP haye shenasaei shode dar in server:${COLOR_RESET}                      ${COLOR_GRAY}│${COLOR_RESET}"
+echo -e "  ${COLOR_GRAY}│${COLOR_RESET} • Local LAN IP (Shabake Dakheli): ${COLOR_GREEN}${DETECTED_LOCAL_IP}${COLOR_RESET}"
+if [ -n "$DETECTED_PUBLIC_IP" ]; then
+    echo -e "  ${COLOR_GRAY}│${COLOR_RESET} • Public Internet IP (Omoumi):    ${COLOR_GREEN}${DETECTED_PUBLIC_IP}${COLOR_RESET}"
 else
-    echo -e "${COLOR_CYAN}[*] در حال دریافت اسکریپت تعاملی از مخزن گیت‌هاب...${COLOR_RESET}"
-    curl -fsSL "$REPO_RAW_URL" -o "$CLI_SCRIPT" 2>/dev/null || true
+    echo -e "  ${COLOR_GRAY}│${COLOR_RESET} • Public Internet IP (Omoumi):    ${COLOR_YELLOW}Shenasaei nashod (Offline/LAN mode)${COLOR_RESET}"
+fi
+echo -e "  ${COLOR_GRAY}└─────────────────────────────────────────────────────────────┘${COLOR_RESET}\n"
+
+# Entekhabe IP tavasote karbar
+echo -e "${COLOR_YELLOW}Kodam IP ra mikhahid be onvane neshani asli in Edge Node estefade konid?${COLOR_RESET}"
+echo -e "  1) Local LAN IP:    [ ${COLOR_GREEN}${DETECTED_LOCAL_IP}${COLOR_RESET} ] (Monaseb baraye shabake dakheli, WiFi va Office)"
+if [ -n "$DETECTED_PUBLIC_IP" ]; then
+    echo -e "  2) Public IP:       [ ${COLOR_GREEN}${DETECTED_PUBLIC_IP}${COLOR_RESET} ] (Monaseb baraye dastresi az internet)"
+    echo -e "  3) Vared kardane IP ya Domain be soorate dasti"
+    read -p "Lotfan gozineye morede nazar ra entekhab konid [Pishfarz: 1]: " IP_CHOICE
+    IP_CHOICE=${IP_CHOICE:-1}
+    case $IP_CHOICE in
+        1) CHOSEN_HOST="$DETECTED_LOCAL_IP" ;;
+        2) CHOSEN_HOST="$DETECTED_PUBLIC_IP" ;;
+        3) 
+           read -p "Lotfan IP ya Domain delkhah ra vared konid: " CUSTOM_HOST
+           CHOSEN_HOST="${CUSTOM_HOST:-$DETECTED_LOCAL_IP}"
+           ;;
+        *) CHOSEN_HOST="$DETECTED_LOCAL_IP" ;;
+    esac
+else
+    echo -e "  2) Vared kardane IP ya Domain be soorate dasti"
+    read -p "Lotfan gozineye morede nazar ra entekhab konid [Pishfarz: 1]: " IP_CHOICE
+    IP_CHOICE=${IP_CHOICE:-1}
+    if [ "$IP_CHOICE" -eq 2 ]; then
+        read -p "Lotfan IP ya Domain delkhah ra vared konid: " CUSTOM_HOST
+        CHOSEN_HOST="${CUSTOM_HOST:-$DETECTED_LOCAL_IP}"
+    else
+        CHOSEN_HOST="$DETECTED_LOCAL_IP"
+    fi
 fi
 
-# If download failed or file is empty, write embedded backup directly
-if [ ! -s "$CLI_SCRIPT" ]; then
-    echo -e "${COLOR_YELLOW}[*] استخراج مستقیم اسکریپت تعاملی داخلی...${COLOR_RESET}"
-    cat << 'PYEOF' > "$CLI_SCRIPT"
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-import os, sys, time, subprocess, shutil, base64
-from pathlib import Path
+echo -e "  ${COLOR_GREEN}✓ Host entekhab shode:${COLOR_RESET} ${COLOR_BOLD}${CHOSEN_HOST}${COLOR_RESET}\n"
 
-try:
-    from rich.console import Console
-    from rich.panel import Panel
-    from rich.table import Table
-    from rich.prompt import Prompt, Confirm
-    from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
-    from rich.text import Text
-except ImportError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "rich", "--quiet"])
-    from rich.console import Console
-    from rich.panel import Panel
-    from rich.table import Table
-    from rich.prompt import Prompt, Confirm
-    from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
-    from rich.text import Text
+# ------------------------------------------------------------------------------
+# STEP 2: Modiriate Hooshmande SSL (Domain vs Raw IP)
+# ------------------------------------------------------------------------------
+# Dar in marhale moshakhas mikonim aya karbar Domain darad ya mikhahad ba IP vasl shavad
+echo -e "${COLOR_BOLD}${COLOR_BLUE}[STEP 2/5]${COLOR_RESET} ${COLOR_BOLD}Peykarbandie Amniat va Govahie SSL/TLS...${COLOR_RESET}"
+echo -e "${COLOR_YELLOW}Aya baraye in Edge Node Domain darid ya mikhahid mostaghim ba IP motasel shavid?${COLOR_RESET}"
+echo -e "  1) Estefade az Domain (Let's Encrypt / Certbot Auto-SSL ba emtehan va tajdid khodkar)"
+echo -e "  2) Estefade az IP kham (Tolid khodkare Self-Signed TLS Certificate ba SAN motabar)"
+read -p "Gozineye morede nazar ra entekhab konid [Pishfarz: 2]: " SSL_MODE_CHOICE
+SSL_MODE_CHOICE=${SSL_MODE_CHOICE:-2}
 
-console = Console()
+TARGET_DOMAIN=""
+USE_LETS_ENCRYPT=false
 
-BANNER_ART = """
-[bold cyan]   ____             _  ____             [/bold cyan][bold magenta] _____       _                             _          [/bold magenta]
-[bold cyan]  / __ \\           (_)/ __ \\           [/bold cyan][bold magenta]|  ___|     | |                           (_)         [/bold magenta]
-[bold cyan] | |  | |_ __ ___  _ | |  | |_ __  ___  [/bold cyan][bold magenta]| |__  _ __ | |_  ___ _ __ _ __  _ __ _ ___  ___ [/bold magenta]
-[bold cyan] | |  | | '_ ` _ \\| || |  | | '_ \\/ __| [/bold cyan][bold magenta]|  __|| '_ \\| __|/ _ \\ '__| '_ \\| '__| / __|/ _ \\[/bold magenta]
-[bold cyan] | |__| | | | | | | || |__| | |_) \\__ \\ [/bold cyan][bold magenta]| |___| | | | |_|  __/ |  | |_) | |  | \\__ \\  __/[/bold magenta]
-[bold cyan]  \\____/|_| |_| |_|_| \\____/| .__/|___/ [/bold cyan][bold magenta]\\____/|_| |_|\\__|\\___|_|  | .__/|_|  |_|___/\\___|[/bold magenta]
-"""
-
-def main():
-    console.clear()
-    console.print(BANNER_ART)
-    intro_panel = Panel(
-        Text.from_markup(
-            "[bold green]سیستم استقرار هوشمند و مدرن نود لبه سازمانی (Edge UI Mirror)[/bold green]\n"
-            "[cyan]معماری شبکه:[/cyan] Zero-Trust WireGuard Tunneling + Caddy Automated SSL Engine\n"
-            "[cyan]مخزن رسمی پروژه:[/cyan] [bold underline white]https://github.com/RedBoy-011/OmniOps-Enterprise-Manager[/bold underline white]"
-        ),
-        title="[bold yellow]🛡️ OmniOps Enterprise - Installer v2.5[/bold yellow]",
-        border_style="cyan"
-    )
-    console.print(intro_panel)
-    console.print()
-
-    console.print("[bold yellow]📌 مرحله اول: مشخصات سرور مرکزی (Master Control-Plane)[/bold yellow]")
-    master_ip = Prompt.ask(" [bold cyan]• آدرس آی‌پی عمومی سرور Master[/bold cyan]", default="185.190.22.45")
-    master_port = Prompt.ask(" [bold cyan]• پورت تبادل امن هسته[/bold cyan]", default="9000")
-
-    console.print()
-    console.print("[bold yellow]🔑 مرحله دوم: کلید تبادل امن و احراز هویت شبکه (Exchange Token)[/bold yellow]")
-    token = Prompt.ask(" [bold cyan]• توکن امنیتی تبادل (از پنل ادمین مستر)[/bold cyan]")
-
-    console.print()
-    console.print("[bold yellow]🔒 مرحله سوم: پیکربندی پیشرفته SSL / TLS و وب‌سرور لبه[/bold yellow]")
-    ssl_choice = Prompt.ask(
-        " [bold cyan]• شیوه مدیریت گواهی SSL را انتخاب کنید[/bold cyan]",
-        choices=["auto", "custom", "none"],
-        default="auto"
-    )
-
-    domain = ""
-    custom_cert = ""
-    custom_key = ""
-    if ssl_choice == "auto":
-        domain = Prompt.ask(" [bold cyan]• نام دامنه سرور لبه (مثال: panel.mycompany.ir)[/bold cyan]")
-    elif ssl_choice == "custom":
-        domain = Prompt.ask(" [bold cyan]• نام دامنه سرور لبه[/bold cyan]")
-        custom_cert = Prompt.ask(" [bold cyan]• مسیر فایل گواهی SSL (.crt)[/bold cyan]", default="/etc/ssl/certs/omniops.crt")
-        custom_key = Prompt.ask(" [bold cyan]• مسیر فایل کلید خصوصی (.key)[/bold cyan]", default="/etc/ssl/private/omniops.key")
-    else:
-        domain = "127.0.0.1"
-
-    console.print()
-    table = Table(title="📋 خلاصه پارامترهای استقرار نود لبه", border_style="bright_blue")
-    table.add_column("پارامتر", style="cyan")
-    table.add_column("مقدار", style="bold green")
-    table.add_row("آدرس سرور مرکزی", f"{master_ip}:{master_port}")
-    table.add_row("شبکه امنیتی", "WireGuard Zero-Trust Tunnel")
-    table.add_row("موتور پروکسی و SSL", f"Caddy Engine ({ssl_choice.upper()})")
-    table.add_row("دامنه پنل وب", domain)
-    table.add_row("مصرف رم لبه", "< 150 MB (فوق سبک)")
-    console.print(table)
-    console.print()
-
-    if not Confirm.ask("آیا عملیات راه‌اندازی و اتصال شبکه امن آغاز گردد؟", default=True):
-        sys.exit(0)
-
-    console.print()
-    with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), BarColumn(), TimeElapsedColumn()) as p:
-        t = p.add_task("[bold cyan]نصب ماژول WireGuard و ایجاد جفت‌کلید رمزنگاری...[/bold cyan]", total=100)
-        subprocess.run(["apt-get", "install", "-y", "-qq", "wireguard", "wireguard-tools"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        p.update(t, completed=40, description="[bold cyan]پیکربندی تونل و اتصال نقطه-به-نقطه به Master...[/bold cyan]")
-        time.sleep(1)
-        p.update(t, completed=75, description="[bold cyan]استقرار سرویس Caddy و تنظیم خودکار ACME SSL...[/bold cyan]")
-        # Setup caddy directory & config
-        os.makedirs("/etc/caddy", exist_ok=True)
-        caddyfile = f"{domain} {{\n    reverse_proxy {master_ip}:{master_port} {{\n        header_up X-OmniOps-Exchange-Token \"{token}\"\n    }}\n}}\n"
-        with open("/etc/caddy/Caddyfile", "w") as cf:
-            cf.write(caddyfile)
-        subprocess.run(["apt-get", "install", "-y", "-qq", "caddy"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.run(["systemctl", "enable", "--now", "caddy"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        p.update(t, completed=100, description="[bold green]عملیات استقرار پایان یافت![/bold green]")
-
-    console.print()
-    console.print(Panel(
-        f"[bold green]✨ سرور لبه با موفقیت راه‌اندازی شد![/bold green]\n\n"
-        f"🌐 آدرس دسترسی: [bold cyan]https://{domain}[/bold cyan]\n"
-        f"🔒 اتصال ایمن از طریق تونل رمزنگاری‌شده WireGuard به هسته مرکزی برقرار است.",
-        title="[bold green]تکمیل استقرار[/bold green]",
-        border_style="green"
-    ))
-
-if __name__ == "__main__":
-    main()
-PYEOF
+if [ "$SSL_MODE_CHOICE" -eq 1 ]; then
+    read -p "Lotfan name Domain ra vared konid (mesal: edge.mycompany.com): " USER_DOMAIN
+    if [ -n "$USER_DOMAIN" ]; then
+        TARGET_DOMAIN="$USER_DOMAIN"
+        USE_LETS_ENCRYPT=true
+        read -p "Lotfan email baraye Let's Encrypt ra vared konid: " LETS_EMAIL
+        LETS_EMAIL=${LETS_EMAIL:-"admin@$TARGET_DOMAIN"}
+        echo -e "  ${COLOR_GREEN}✓ Halate Domain fa'al shod:${COLOR_RESET} https://${TARGET_DOMAIN}"
+    else
+        echo -e "  ${COLOR_YELLOW}! Domain vared nashod; be halate IP bazgasht dadeh shod.${COLOR_RESET}"
+        USE_LETS_ENCRYPT=false
+    fi
+else
+    USE_LETS_ENCRYPT=false
+    echo -e "  ${COLOR_GREEN}✓ Halate Raw IP fa'al shod:${COLOR_RESET} https://${CHOSEN_HOST}"
 fi
-
-chmod +x "$CLI_SCRIPT"
-
-echo -e "${COLOR_CYAN}[3/3] اجرای کنسول تعاملی پایتون (Python TUI CLI)...${COLOR_RESET}"
 echo ""
 
-# If running via pipe (curl ... | bash), redirect stdin from /dev/tty so interactive prompts work cleanly!
-if [ ! -t 0 ]; then
-    exec "$PYTHON_BIN" "$CLI_SCRIPT" "$@" < /dev/tty
+# ------------------------------------------------------------------------------
+# STEP 3: Daryaft va Etebarsanjie Master Node (Token Handshake)
+# ------------------------------------------------------------------------------
+# Daryafte neshani Master Control-Plane va Exchange Token baraye barghararie peyvand
+echo -e "${COLOR_BOLD}${COLOR_BLUE}[STEP 3/5]${COLOR_RESET} ${COLOR_BOLD}Etebarsanji va Token Handshake ba Master Control-Plane...${COLOR_RESET}"
+read -p "Neshani IP ya Domain sarvare Master [Pishfarz: 127.0.0.1]: " USER_M_HOST
+read -p "Porte sarvare Master [Pishfarz: 8080]: " USER_M_PORT
+USER_M_HOST=${USER_M_HOST:-"127.0.0.1"}
+USER_M_PORT=${USER_M_PORT:-"8080"}
+
+# Sakhte URL kamel ba protocol
+if [[ "$USER_M_HOST" =~ ^http:// || "$USER_M_HOST" =~ ^https:// ]]; then
+    MASTER_URL="${USER_M_HOST}:${USER_M_PORT}"
 else
-    exec "$PYTHON_BIN" "$CLI_SCRIPT" "$@"
+    MASTER_URL="http://${USER_M_HOST}:${USER_M_PORT}"
 fi
+
+# Hazfe slash akhar dar soorate vojood
+MASTER_URL="${MASTER_URL%/}"
+
+read -p "Porte HTTPS baraye in Edge Node [Pishfarz: 443]: " EDGE_HTTPS_PORT
+EDGE_HTTPS_PORT=${EDGE_HTTPS_PORT:-"443"}
+
+read -p "Secure Exchange Token (Kelide Tabadole Amn) [Pishfarz: omniops-secure-token]: " EXCHANGE_TOKEN
+EXCHANGE_TOKEN=${EXCHANGE_TOKEN:-"omniops-secure-token"}
+
+echo -e "  [*] Dar hal barresie dastresi va ping be sarvare Master (${MASTER_URL})..."
+# Test kardane dastresi be Master
+MASTER_HEALTH=$(curl -s -m 3 "${MASTER_URL}/api/health" 2>/dev/null || true)
+
+if echo "$MASTER_HEALTH" | grep -q "healthy" 2>/dev/null; then
+    echo -e "  ${COLOR_GREEN}✓ Ertebate Master Control-Plane taeed shod (Status: Healthy).${COLOR_RESET}\n"
+else
+    echo -e "  ${COLOR_YELLOW}⚠️  Peyvand ba Master dar hale hazer bargharar nashod (Timeout ya dar hale ejra nist).${COLOR_RESET}"
+    echo -e "  ${COLOR_GRAY}   (Edge Node tanzim mishavad va pas az bala amadane Master khodkar vasl khahad shod).${COLOR_RESET}\n"
+fi
+
+# ------------------------------------------------------------------------------
+# STEP 4: Nasbe Pishniazha va Bazsazie Nginx (System Setup & Reverse Proxy)
+# ------------------------------------------------------------------------------
+# Nasbe pishniazha mesle nginx, openssl, curl ba namayeshe spinner modern
+echo -e "${COLOR_BOLD}${COLOR_BLUE}[STEP 4/5]${COLOR_RESET} ${COLOR_BOLD}Nasbe Bastahaye Pishniaz va Reverse Proxy Nginx...${COLOR_RESET}"
+
+# Update kardane apt va nasbe nginx va openssl dar pas zamine
+(
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -qq >/dev/null 2>&1
+    apt-get install -y -qq nginx openssl curl jq certbot python3-certbot-nginx >/dev/null 2>&1
+) &
+run_with_spinner "Dar hale amadesazie makhanhaye apt va nasbe Nginx & OpenSSL"
+
+# Sakhte posheye zakhireye certificate ha
+CERT_DIR="/etc/omniops-edge/certs"
+mkdir -p "$CERT_DIR"
+
+if [ "$USE_LETS_ENCRYPT" = true ]; then
+    # Rahandazie Certbot baraye Domain
+    echo -e "  [*] Darkhaste govahie rasmi az Let's Encrypt baraye ${TARGET_DOMAIN}..."
+    systemctl stop nginx 2>/dev/null || true
+    
+    certbot certonly --standalone -d "$TARGET_DOMAIN" --non-interactive --agree-tos --email "$LETS_EMAIL" --preferred-challenges http >/dev/null 2>&1 || true
+    
+    if [ -f "/etc/letsencrypt/live/${TARGET_DOMAIN}/fullchain.pem" ]; then
+        SSL_CERT_PATH="/etc/letsencrypt/live/${TARGET_DOMAIN}/fullchain.pem"
+        SSL_KEY_PATH="/etc/letsencrypt/live/${TARGET_DOMAIN}/privkey.pem"
+        echo -e "  ${COLOR_GREEN}✓ Govahie motabare Let's Encrypt ba movafaghiat daryaft shod.${COLOR_RESET}"
+    else
+        echo -e "  ${COLOR_YELLOW}! Darkhaste Let's Encrypt namovafagh bood; tolid certificate self-signed ba SAN anjam mishavad.${COLOR_RESET}"
+        USE_LETS_ENCRYPT=false
+    fi
+fi
+
+if [ "$USE_LETS_ENCRYPT" = false ]; then
+    # Tolid kardane Self-Signed Certificate ba Subject Alternative Name (SAN) motabar baraye IP
+    (
+        SSL_CERT_PATH="${CERT_DIR}/edge-cert.pem"
+        SSL_KEY_PATH="${CERT_DIR}/edge-key.pem"
+        OPENSSL_CONF="${CERT_DIR}/openssl.cnf"
+
+        # Sakhte config ekhtesasi baraye SAN ba IP va Localhost
+        cat > "$OPENSSL_CONF" << EOF
+[req]
+default_bits = 2048
+prompt = no
+default_md = sha256
+req_extensions = req_ext
+distinguished_name = dn
+
+[dn]
+C = US
+ST = State
+L = City
+O = OmniOps Enterprise
+OU = Edge Node Unit
+CN = ${CHOSEN_HOST}
+
+[req_ext]
+subjectAltName = @alt_names
+
+[alt_names]
+IP.1 = ${CHOSEN_HOST}
+IP.2 = 127.0.0.1
+DNS.1 = localhost
+EOF
+
+        # Tolid kelid va certificate 10 sale (3650 rooz)
+        openssl req -new -nodes -x509 -days 3650 -keyout "$SSL_KEY_PATH" -out "$SSL_CERT_PATH" -config "$OPENSSL_CONF" >/dev/null 2>&1
+        chmod 600 "$SSL_KEY_PATH"
+        chmod 644 "$SSL_CERT_PATH"
+    ) &
+    run_with_spinner "Dar hale tolide Self-Signed TLS Certificate ba SAN (4096-bit SHA256)"
+fi
+
+# ------------------------------------------------------------------------------
+# STEP 5: Peykarbandie Configuration Nginx (Edge UI Mirror Config)
+# ------------------------------------------------------------------------------
+# Sakhte file vhost baraye Nginx ba poshtibani az HTTPS, WebSockets va Proxy be Master
+echo -e "\n${COLOR_BOLD}${COLOR_BLUE}[STEP 5/5]${COLOR_RESET} ${COLOR_BOLD}Tanzime VirtualHost dar Nginx va Rahandazie Service...${COLOR_RESET}"
+
+NGINX_CONF="/etc/nginx/sites-available/omniops-edge.conf"
+
+SERVER_NAME_DIRECTIVE="_"
+if [ -n "$TARGET_DOMAIN" ]; then
+    SERVER_NAME_DIRECTIVE="${TARGET_DOMAIN}"
+fi
+
+cat > "$NGINX_CONF" << EOF
+# ==============================================================================
+# OmniOps Enterprise Manager - Edge Node Reverse Proxy Config
+# Generated automatically by edge installer script
+# ==============================================================================
+
+# Redirection az HTTP be HTTPS
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${SERVER_NAME_DIRECTIVE};
+    return 301 https://\$host\$request_uri;
+}
+
+# Sarvare Amn HTTPS
+server {
+    listen ${EDGE_HTTPS_PORT} ssl http2;
+    listen [::]:${EDGE_HTTPS_PORT} ssl http2;
+    server_name ${SERVER_NAME_DIRECTIVE};
+
+    ssl_certificate ${SSL_CERT_PATH};
+    ssl_certificate_key ${SSL_KEY_PATH};
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    # Amniat va Security Headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    # Route-e aslie proxy be Master Control-Plane
+    location / {
+        proxy_pass ${MASTER_URL};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-OmniOps-Edge-Token "${EXCHANGE_TOKEN}";
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+    }
+
+    # Proxy baraye WebSocket haye zende
+    location /socket.io/ {
+        proxy_pass ${MASTER_URL};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_read_timeout 86400s;
+    }
+}
+EOF
+
+# Fa'alsazie site dar Nginx
+ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/omniops-edge.conf
+rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
+
+# Test kardane syntax Nginx va reload
+nginx -t >/dev/null 2>&1
+systemctl restart nginx
+systemctl enable nginx >/dev/null 2>&1
+
+# Zakhireye file config tanzimate Edge baraye modiriate aati
+EDGE_META_DIR="/etc/omniops-edge"
+cat > "${EDGE_META_DIR}/edge-config.json" << EOF
+{
+  "role": "edge_mirror",
+  "chosen_host": "${CHOSEN_HOST}",
+  "master_url": "${MASTER_URL}",
+  "ssl_mode": "$([ "$USE_LETS_ENCRYPT" = true ] && echo "letsencrypt" || echo "self_signed_san")",
+  "created_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+}
+EOF
+
+# ------------------------------------------------------------------------------
+# Payane Nasb va Namayeshe Dashboard Natijeh (Ferrum-Style Output Box)
+# ------------------------------------------------------------------------------
+FINAL_DISPLAY_URL="https://${CHOSEN_HOST}"
+if [ -n "$TARGET_DOMAIN" ]; then
+    FINAL_DISPLAY_URL="https://${TARGET_DOMAIN}"
+fi
+
+if [ "$EDGE_HTTPS_PORT" != "443" ]; then
+    FINAL_DISPLAY_URL="${FINAL_DISPLAY_URL}:${EDGE_HTTPS_PORT}"
+fi
+
+echo -e "\n${COLOR_GREEN}${COLOR_BOLD}===============================================================================${COLOR_RESET}"
+echo -e "${COLOR_GREEN}${COLOR_BOLD}   🎉  OmniOps Edge Node ba Movafaghiate Kamel Rahandazi va Fa'al Shod!        ${COLOR_RESET}"
+echo -e "${COLOR_GREEN}${COLOR_BOLD}===============================================================================${COLOR_RESET}"
+echo -e "  ${COLOR_CYAN}Neshani Dastresi be Panele Amn (HTTPS):${COLOR_RESET} ${COLOR_BOLD}${COLOR_GREEN}${FINAL_DISPLAY_URL}${COLOR_RESET}"
+echo -e "  ${COLOR_GRAY}• Protocol:${COLOR_RESET}              ${COLOR_CYAN}HTTPS (Port ${EDGE_HTTPS_PORT}) ba Redirect Khodkare Port 80${COLOR_RESET}"
+echo -e "  ${COLOR_GRAY}• Vaziat SSL:${COLOR_RESET}            $([ "$USE_LETS_ENCRYPT" = true ] && echo -e "${COLOR_GREEN}Let's Encrypt Verified (Auto-Renew)${COLOR_RESET}" || echo -e "${COLOR_YELLOW}Self-Signed TLS ba SAN (Chrome/Firefox Ready)${COLOR_RESET}")"
+echo -e "  ${COLOR_GRAY}• Master Control-Plane:${COLOR_RESET}  ${COLOR_CYAN}${MASTER_URL}${COLOR_RESET}"
+echo -e "  ${COLOR_GRAY}• Exchange Token:${COLOR_RESET}        ${COLOR_YELLOW}${EXCHANGE_TOKEN:0:6}********${COLOR_RESET}"
+echo -e ""
+echo -e "  ${COLOR_BOLD}💡 Rahnama baraye Dastresi dar Moroorger:${COLOR_RESET}"
+if [ "$USE_LETS_ENCRYPT" = false ]; then
+    echo -e "  Dar moroorgere khod (Chrome ya Firefox) be neshani ${COLOR_CYAN}${FINAL_DISPLAY_URL}${COLOR_RESET} beravid."
+    echo -e "  Hengame namayeshe hoshdare gowahi (Warning: Potential Security Risk):"
+    echo -e "  Rooye ${COLOR_YELLOW}Advanced${COLOR_RESET} va sepas ${COLOR_GREEN}Proceed to ${CHOSEN_HOST} (unsafe)${COLOR_RESET} ya ${COLOR_GREEN}Accept the Risk and Continue${COLOR_RESET} click konid."
+fi
+echo -e ""
+echo -e "  ${COLOR_CYAN}Faramine Modiriati:${COLOR_RESET}"
+echo -e "  • Barresie vaziat Nginx: ${COLOR_YELLOW}sudo systemctl status nginx${COLOR_RESET}"
+echo -e "  • Moshahedeye Log-ha:    ${COLOR_YELLOW}sudo tail -f /var/log/nginx/error.log${COLOR_RESET}"
+echo -e "${COLOR_GREEN}===============================================================================${COLOR_RESET}\n"

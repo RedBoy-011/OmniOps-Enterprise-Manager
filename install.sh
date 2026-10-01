@@ -126,10 +126,26 @@ if ! command -v docker &> /dev/null; then
     sudo usermod -aG docker $USER
 fi
 
+# آماده‌سازی دایرکتوری استقرار و دریافت سورس پروژه در صورت اجرای تک‌خطی
+INSTALL_DIR="/opt/omniops"
+if [ -f "./run.py" ]; then
+    INSTALL_DIR="$(pwd)"
+else
+    echo -e "\n${COLOR_CYAN}[*] در حال آماده‌سازی و دانلود سورس پلتفرم در ${INSTALL_DIR}...${COLOR_RESET}"
+    sudo mkdir -p "$INSTALL_DIR"
+    sudo chown -R $USER:$USER "$INSTALL_DIR" 2>/dev/null || true
+    if [ ! -f "$INSTALL_DIR/run.py" ]; then
+        git clone https://github.com/RedBoy-011/OmniOps-Enterprise-Manager.git "$INSTALL_DIR" 2>/dev/null || {
+            curl -fsSL https://github.com/RedBoy-011/OmniOps-Enterprise-Manager/archive/refs/heads/main.tar.gz | tar -xz -C "$INSTALL_DIR" --strip-components=1
+        }
+    fi
+    cd "$INSTALL_DIR"
+fi
+
 echo -e "\n${COLOR_BLUE}[4/5] ساخت محیط مجازی پایتون و نصب وابستگی‌ها...${COLOR_RESET}"
 # استفاده از پکیج‌های سیستمی جهت سرعت‌بخشی و عدم نیاز به دانلود دوباره
-python3 -m venv --system-site-packages venv
-source venv/bin/activate
+python3 -m venv --system-site-packages "$INSTALL_DIR/venv"
+source "$INSTALL_DIR/venv/bin/activate"
 
 # نصب بسته‌های پایتون با میرورهای پرسرعت و پایدار (جلوگیری از Read Timeout در شبکه ایران)
 echo -e "${COLOR_GREEN}[*] در حال نصب بسته‌های پایتون (Flask, PyJWT, Requests, SQLAlchemy) با میرور پرسرعت...${COLOR_RESET}"
@@ -145,13 +161,14 @@ Description=OmniOps Enterprise Manager Master Service
 After=network.target
 
 [Service]
-User=$USER
-WorkingDirectory=$(pwd)
+User=root
+WorkingDirectory=$INSTALL_DIR
 Environment="PORT=$PORT"
 Environment="ROLE=master"
-Environment="PATH=$(pwd)/venv/bin"
-ExecStart=$(pwd)/venv/bin/python3 run.py
+Environment="PATH=$INSTALL_DIR/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin"
+ExecStart=$INSTALL_DIR/venv/bin/python3 $INSTALL_DIR/run.py
 Restart=always
+RestartSec=3
 
 [Install]
 WantedBy=multi-user.target
@@ -161,15 +178,26 @@ sudo systemctl daemon-reload
 sudo systemctl enable omniops
 sudo systemctl start omniops
 
-SERVER_IP=$(curl -s ifconfig.me || hostname -I | awk '{print $1}')
+# Tashkhise sahihe IP haye mahali (LAN) va omoumi (Public) bedoone kharabi ba 403
+LOCAL_IP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{print $7}' || hostname -I 2>/dev/null | awk '{print $1}' || echo "127.0.0.1")
+PUBLIC_IP=$(curl -s -m 2 https://api.ipify.org 2>/dev/null || curl -s -m 2 https://icanhazip.com 2>/dev/null || echo "")
+
+if [[ "$PUBLIC_IP" =~ "<" ]] || [ -z "$PUBLIC_IP" ]; then
+    PUBLIC_IP=""
+fi
 
 echo -e "\n${COLOR_GREEN}==========================================================${COLOR_RESET}"
 echo -e "${COLOR_GREEN}✅ نصب پنل مرکزی (Master Node) با موفقیت انجام شد!${COLOR_RESET}"
-echo -e "🌐 آدرس دسترسی به پنل ادمین: ${COLOR_CYAN}http://${SERVER_IP}:${PORT}${COLOR_RESET}"
+echo -e "🌐 آدرس‌های دسترسی به پنل ادمین:"
+echo -e "   • شبکه محلی (LAN / WiFi داخلی):    ${COLOR_CYAN}http://${LOCAL_IP}:${PORT}${COLOR_RESET}"
+if [ -n "$PUBLIC_IP" ]; then
+    echo -e "   • اینترنت عمومی (Public IP):       ${COLOR_CYAN}http://${PUBLIC_IP}:${PORT}${COLOR_RESET}"
+fi
+echo -e "   • دسترسی روی همین سرور (Localhost): ${COLOR_CYAN}http://localhost:${PORT}${COLOR_RESET}"
 echo -e "⚙️ وضعیت سرویس: ${COLOR_YELLOW}sudo systemctl status omniops${COLOR_RESET}"
 echo -e ""
 echo -e "🔗 ${COLOR_YELLOW}نحوه اتصال سرورهای دوم و سوم (Worker Nodes) برای توزیع بار سنگین:${COLOR_RESET}"
 echo -e "   روی هر سرور عملیاتی دوم، دستور زیر را اجرا کنید:"
-echo -e "   ${COLOR_CYAN}curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/deployment/install-worker.sh | bash -s -- --master http://${SERVER_IP}:${PORT}${COLOR_RESET}"
+echo -e "   ${COLOR_CYAN}curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/deployment/install-worker.sh | bash -s -- --master http://${LOCAL_IP}:${PORT}${COLOR_RESET}"
 echo -e "${COLOR_GREEN}==========================================================${COLOR_RESET}"
 

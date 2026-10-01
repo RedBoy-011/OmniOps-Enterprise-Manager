@@ -20,12 +20,16 @@ echo -e "${COLOR_CYAN}    استقرار گره پردازشی توزیع‌شد
 echo -e "${COLOR_CYAN}==========================================================${COLOR_RESET}"
 
 MASTER_URL=""
+MASTER_PORT="8080"
+WORKER_PORT="11434"
 JOIN_TOKEN=""
 NODE_NAME="$(hostname)-worker"
 
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --master) MASTER_URL="$2"; shift ;;
+        --port) MASTER_PORT="$2"; shift ;;
+        --worker-port) WORKER_PORT="$2"; shift ;;
         --token) JOIN_TOKEN="$2"; shift ;;
         --name) NODE_NAME="$2"; shift ;;
         *) echo "Unknown parameter: $1"; exit 1 ;;
@@ -33,12 +37,33 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
+# Tashkhise sahihe format URL Master
 if [ -z "$MASTER_URL" ]; then
-    read -p "لطفاً آدرس کامل سرور مستر را وارد کنید (مثال: http://192.168.1.100:9000): " MASTER_URL
+    read -p "آدرس IP یا دامنه سرور مستر (مثال: 127.0.0.1 یا 192.168.1.50): " USER_MASTER_HOST
+    read -p "پورت سرور مستر [پیش‌فرض 8080]: " USER_MASTER_PORT
+    USER_MASTER_HOST=${USER_MASTER_HOST:-"127.0.0.1"}
+    USER_MASTER_PORT=${USER_MASTER_PORT:-"8080"}
+    MASTER_URL="http://${USER_MASTER_HOST}:${USER_MASTER_PORT}"
+else
+    # Agar karbar faghat IP dade bood (mesle 127.0.0.1)
+    if [[ ! "$MASTER_URL" =~ ^http:// && ! "$MASTER_URL" =~ ^https:// ]]; then
+        if [[ "$MASTER_URL" =~ :[0-9]+$ ]]; then
+            MASTER_URL="http://${MASTER_URL}"
+        else
+            MASTER_URL="http://${MASTER_URL}:${MASTER_PORT}"
+        fi
+    fi
 fi
 
+# Hazfe slash akhar
+MASTER_URL="${MASTER_URL%/}"
+
+read -p "پورت اختصاصی اجرای Worker (Ollama) [پیش‌فرض 11434]: " INPUT_WORKER_PORT
+WORKER_PORT=${INPUT_WORKER_PORT:-$WORKER_PORT}
+
 if [ -z "$JOIN_TOKEN" ]; then
-    read -p "توکن امنیتی الحاق به خوشه (Cluster Join Token): " JOIN_TOKEN
+    read -p "توکن امنیتی الحاق به خوشه (Cluster Join Token) [پیش‌فرض: omniops-worker-token]: " JOIN_TOKEN
+    JOIN_TOKEN=${JOIN_TOKEN:-"omniops-worker-token"}
 fi
 
 # ==============================================================================
@@ -63,12 +88,14 @@ if command -v nvidia-smi &> /dev/null; then
     fi
 fi
 
-NODE_IP=$(curl -s ifconfig.me || hostname -I | awk '{print $1}')
+# Tashkhise sahihe IP bedoone kharabie 403
+NODE_IP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{print $7}' || hostname -I 2>/dev/null | awk '{print $1}' || echo "127.0.0.1")
 
 echo -e "----------------------------------------------------------"
 echo -e " 🖥️ مشخصات Worker Node ثانویه:"
 echo -e " • نام نود:              ${COLOR_CYAN}${NODE_NAME}${COLOR_RESET}"
 echo -e " • آی‌پی:                ${COLOR_CYAN}${NODE_IP}${COLOR_RESET}"
+echo -e " • پورت Worker:          ${COLOR_CYAN}${WORKER_PORT}${COLOR_RESET}"
 echo -e " • پردازنده:             ${COLOR_GREEN}${CPU_MODEL} (${CPU_CORES} vCPUs)${COLOR_RESET}"
 echo -e " • حافظه RAM:            ${COLOR_GREEN}${TOTAL_RAM_GB} GB${COLOR_RESET}"
 echo -e " • شتاب‌دهنده گرافیکی:   ${COLOR_GREEN}${GPU_NAME}${COLOR_RESET}"
@@ -95,12 +122,13 @@ if ! command -v docker &> /dev/null; then
 fi
 
 # اجرای کانتینر Ollama روی سرور کمکی
-echo -e "\n${COLOR_BLUE}[3/4] راه‌اندازی کانتینر Ollama Dedicated Node...${COLOR_RESET}"
+echo -e "\n${COLOR_BLUE}[3/4] راه‌اندازی کانتینر Ollama Dedicated Node روی پورت ${WORKER_PORT}...${COLOR_RESET}"
 if command -v docker &> /dev/null; then
+    docker rm -f omniops_worker_ollama 2>/dev/null || true
     if [ "$HAS_GPU" = true ]; then
-        docker run -d --gpus=all -v ollama_storage:/root/.ollama -p 11434:11434 --name omniops_worker_ollama --restart always ollama/ollama 2>/dev/null || true
+        docker run -d --gpus=all -v ollama_storage:/root/.ollama -p ${WORKER_PORT}:11434 --name omniops_worker_ollama --restart always ollama/ollama 2>/dev/null || true
     else
-        docker run -d -v ollama_storage:/root/.ollama -p 11434:11434 --name omniops_worker_ollama --restart always ollama/ollama 2>/dev/null || true
+        docker run -d -v ollama_storage:/root/.ollama -p ${WORKER_PORT}:11434 --name omniops_worker_ollama --restart always ollama/ollama 2>/dev/null || true
     fi
 fi
 
