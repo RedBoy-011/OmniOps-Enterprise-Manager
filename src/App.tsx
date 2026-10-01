@@ -27,6 +27,7 @@ import { ChatModule } from './components/ChatModule';
 import { ServerManagementModule } from './components/ServerManagementModule';
 import { McpRulesManagerModal } from './components/McpRulesManagerModal';
 import { DesktopOverlayCompanion } from './components/DesktopOverlayCompanion';
+import { MinimalistAiOsView } from './components/MinimalistAiOsView';
 import { 
   Shield, 
   MessageSquare, 
@@ -51,6 +52,7 @@ import {
 export default function App() {
   // Navigation tabs: 'chat' is the default and first tab
   const [activeTab, setActiveTab] = useState<'chat' | 'tools' | 'server_infra' | 'settings' | 'auth'>('chat');
+  const [viewLayout, setViewLayout] = useState<'minimalist_ai_os' | 'classic_dashboard'>('minimalist_ai_os');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [agentRunning, setAgentRunning] = useState<boolean>(true);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -1653,6 +1655,30 @@ Try {
             </button>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (viewLayout === 'minimalist_ai_os') {
+    return (
+      <div className="relative w-full h-screen overflow-hidden" dir="rtl">
+        {/* Floating Switcher to Classic Dashboard */}
+        <div className="fixed top-3 left-4 z-50">
+          <button
+            onClick={() => setViewLayout('classic_dashboard')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-700/80 text-[11px] font-mono text-zinc-300 hover:text-white backdrop-blur-md shadow-lg transition-all"
+            title="رفتن به داشبورد چندماژوله کلاسیک"
+          >
+            <Activity className="w-3.5 h-3.5 text-cyan-400" />
+            <span>داشبورد کلاسیک</span>
+          </button>
+        </div>
+
+        <MinimalistAiOsView 
+          currentUser={currentUser} 
+          onSwitchUser={(user) => setCurrentUser(user)}
+          onOpenSettings={() => setViewLayout('classic_dashboard')}
+        />
       </div>
     );
   }

@@ -1,4 +1,39 @@
-export type UserRole = 'SuperAdmin' | 'Admin' | 'User';
+export type UserRole = 'SuperAdmin' | 'Admin' | 'Operator' | 'Viewer' | 'User';
+
+export type EffortLevel = 'medium' | 'high' | 'deep';
+export type ApprovalGate = 'manual' | 'semi_auto' | 'full_access';
+
+export interface WorkspaceFolder {
+  id: string;
+  name: string;
+  path: string;
+  branch?: string;
+  repoType?: 'git' | 'local' | 'remote';
+}
+
+export interface AccessRequest {
+  id: string;
+  fullName: string;
+  email: string;
+  department: string;
+  requestedRole: UserRole;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+}
+
+export interface SandboxExecutionJob {
+  id: string;
+  command: string;
+  environment: 'microvm' | 'docker';
+  status: 'queued' | 'running' | 'success' | 'failed';
+  logs: string[];
+  diff?: string;
+  exitCode?: number;
+  executionTimeMs?: number;
+  stdout?: string;
+  stderr?: string;
+}
 
 export interface User {
   id: number;

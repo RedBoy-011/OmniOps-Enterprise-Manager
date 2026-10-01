@@ -15,6 +15,9 @@ from modules.tools.routes import tools_bp
 from modules.chat.routes import chat_bp
 from modules.local_stack.routes import local_stack_bp
 from modules.cluster.routes import cluster_bp
+from modules.sandbox.routes import sandbox_bp
+from modules.mcp.routes import mcp_bp
+from modules.skills.routes import skills_bp
 from core.model_manager import start_background_model_monitor
 
 def create_app(config_class=Config):
@@ -41,6 +44,9 @@ def create_app(config_class=Config):
     app.register_blueprint(local_stack_bp, url_prefix='/api/local-stack')
     app.register_blueprint(cluster_bp, url_prefix='/api/v1/cluster')
     app.register_blueprint(cluster_bp, url_prefix='/api/cluster')
+    app.register_blueprint(sandbox_bp, url_prefix='/api/v1/sandbox')
+    app.register_blueprint(mcp_bp, url_prefix='/api/v1/mcp')
+    app.register_blueprint(skills_bp, url_prefix='/api/v1/skills')
 
     # Health check endpoint
     @app.route('/api/health', methods=['GET'])
