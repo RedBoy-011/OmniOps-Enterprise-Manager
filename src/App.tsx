@@ -26,6 +26,7 @@ import { ToolsModule } from './components/ToolsModule';
 import { ChatModule } from './components/ChatModule';
 import { ServerManagementModule } from './components/ServerManagementModule';
 import { McpRulesManagerModal } from './components/McpRulesManagerModal';
+import { DesktopOverlayCompanion } from './components/DesktopOverlayCompanion';
 import { 
   Shield, 
   MessageSquare, 
@@ -43,7 +44,8 @@ import {
   Terminal,
   Server,
   Sun,
-  Moon
+  Moon,
+  Laptop
 } from 'lucide-react';
 
 export default function App() {
@@ -52,6 +54,7 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [agentRunning, setAgentRunning] = useState<boolean>(true);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isDesktopOverlayOpen, setIsDesktopOverlayOpen] = useState(false);
 
   // Raw Installation & Setup State
   const [isInstalled, setIsInstalled] = useState<boolean>(() => {
@@ -182,6 +185,21 @@ export default function App() {
         return u;
       })
     );
+  };
+
+  const handleExecuteStructuredAction = (type: 'WIN_AGENT' | 'WEB_EXT', action: string, command: string) => {
+    setSystemLogs((prev) => [
+      {
+        id: `log-${Date.now()}`,
+        timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        level: 'SUCCESS',
+        component: type === 'WIN_AGENT' ? 'Core' : 'Network',
+        phase: 'DISPATCH',
+        message: `اجرای بازوی [${type}:${action}]: ${command}`,
+        details: `نشست ویندوز: ${currentUser?.username || 'arman'} (ایزوله‌شده در %AppData%)`
+      },
+      ...prev
+    ]);
   };
 
   // Strict Role-Based Profile Isolation: regular users can ONLY access chat
@@ -1751,6 +1769,22 @@ Try {
 
         {/* Right Status & Profile */}
         <div className="flex items-center gap-3">
+          {/* Desktop Overlay & Tray Companion Button */}
+          <button
+            type="button"
+            onClick={() => setIsDesktopOverlayOpen((prev) => !prev)}
+            className={`px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 border ${
+              isDesktopOverlayOpen
+                ? 'bg-sky-500/20 text-sky-200 border-sky-500/50 shadow-sm'
+                : 'bg-zinc-800/80 text-zinc-300 hover:text-white hover:bg-zinc-800 border-zinc-700/60'
+            }`}
+            title="نوار ابزار شناور ایجنت دسکتاپ (System Tray & Floating Overlay UI)"
+          >
+            <Laptop className="w-3.5 h-3.5 text-sky-400" />
+            <span className="hidden sm:inline">ایجنت دسکتاپ</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          </button>
+
           {currentUser ? (
             <div
               onClick={() => setIsProfileModalOpen(true)}
@@ -2152,6 +2186,39 @@ Try {
           setPrefilledPrompt({ text: samplePrompt, skillId: 'skill_lint_and_test' });
         }}
       />
+
+      {/* 🖥️ Desktop Overlay Companion & Floating System Tray Window */}
+      <DesktopOverlayCompanion
+        isOpen={isDesktopOverlayOpen}
+        onClose={() => setIsDesktopOverlayOpen(false)}
+        currentUser={currentUser}
+        onSwitchUser={(newUser) => setCurrentUser(newUser)}
+        availableModels={availableModels}
+        onExecuteStructuredAction={handleExecuteStructuredAction}
+      />
+
+      {/* Floating System Tray Simulator Bar (Windows Taskbar Companion) */}
+      <div 
+        className="fixed bottom-3 left-4 z-40 bg-[#16161c]/90 backdrop-blur-md border border-zinc-800/90 rounded-xl px-3 py-1.5 shadow-xl flex items-center gap-3 text-xs select-none hover:border-zinc-700 transition-all cursor-pointer group"
+        onClick={() => setIsDesktopOverlayOpen((prev) => !prev)}
+        title="کلیک جهت باز کردن اورلی دسکتاپ و ایجنت سینی سیستم (System Tray & Overlay UI)"
+      >
+        <div className="flex items-center gap-2">
+          <div className="w-5 h-5 rounded-md bg-gradient-to-tr from-sky-500 to-blue-600 flex items-center justify-center text-white font-black text-[11px] shadow-sm group-hover:scale-105 transition-transform">
+            Ω
+          </div>
+          <span className="text-[11px] font-bold text-zinc-200 hidden sm:inline">OmniOps Tray</span>
+        </div>
+        <div className="h-3 w-px bg-zinc-700/60" />
+        <div className="flex items-center gap-1.5 text-[10px] text-zinc-400 font-mono">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span>@{currentUser?.username || 'arman'} (%AppData% Isolated)</span>
+        </div>
+        <div className="h-3 w-px bg-zinc-700/60" />
+        <span className="text-[10px] text-sky-400 font-mono">
+          {new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })}
+        </span>
+      </div>
     </div>
   );
 }

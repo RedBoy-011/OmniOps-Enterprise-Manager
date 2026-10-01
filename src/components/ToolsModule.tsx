@@ -127,6 +127,7 @@ export const ToolsModule: React.FC<ToolsModuleProps> = ({
   const [isScriptModalOpen, setIsScriptModalOpen] = useState<boolean>(false);
   const [previewScriptType, setPreviewScriptType] = useState<'install_bat' | 'install_ps1' | 'uninstall_bat' | 'uninstall_ps1'>('uninstall_ps1');
   const [copiedScript, setCopiedScript] = useState<boolean>(false);
+  const [copiedInstallCmd, setCopiedInstallCmd] = useState<boolean>(false);
 
   // Simulated Uninstallation State (User request: option to remove agent beside install files)
   const [isUninstallingAgent, setIsUninstallingAgent] = useState<boolean>(false);
@@ -1655,6 +1656,69 @@ Start-Sleep -Seconds 3`;
           {/* TAB 1: Windows Agent Package & Installer */}
           {activeDownloadTab === 'windows' && (
             <div className="space-y-4 animate-in fade-in">
+              {/* Standalone Interactive Installer & User Session Isolation Banner */}
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-sky-950/60 via-[#14141c] to-blue-950/40 border border-sky-500/40 space-y-3 shadow-lg">
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-sky-500/20 text-sky-400 border border-sky-500/30 flex items-center justify-center shrink-0">
+                      <ShieldCheck className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-white text-xs">
+                          اسکریپت تعاملی نصب و احراز هویت دستگاه (Standalone Installer & User Session Isolation)
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono">
+                          Zero-Trust Architecture
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-zinc-300 mt-0.5 leading-relaxed">
+                        دریافت آدرس Master و کلید تبادل امن (HMAC/JWT) به صورت تعاملی در CLI، ذخیره انحصاری توکن در <code className="text-sky-300 font-mono">%AppData%\OmniOpsAgent</code> و توقف خودکار سشن قبلی هنگام سوییچ کاربر ویندوز (آرمان vs مسعود).
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <a
+                      href="/agent/install-agent.ps1"
+                      download="install-agent.ps1"
+                      className="px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-md shadow-sky-600/30"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>دانلود install-agent.ps1</span>
+                    </a>
+                    <a
+                      href="/agent/install-agent.sh"
+                      download="install-agent.sh"
+                      className="px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold flex items-center gap-1.5 transition-all border border-zinc-700"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>اسکریپت لینوکس (.sh)</span>
+                    </a>
+                  </div>
+                </div>
+
+                {/* 1-Click PowerShell Run Command */}
+                <div className="p-2.5 rounded-xl bg-black/60 border border-zinc-800 font-mono text-xs flex items-center justify-between gap-3" dir="ltr">
+                  <div className="flex items-center gap-2 overflow-x-auto text-emerald-400">
+                    <span className="text-zinc-500 select-none">PS&gt;</span>
+                    <span className="select-all">irm https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/agent/install-agent.ps1 | iex</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText('irm https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/agent/install-agent.ps1 | iex');
+                      setCopiedInstallCmd(true);
+                      setTimeout(() => setCopiedInstallCmd(false), 2000);
+                    }}
+                    className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors shrink-0"
+                    title="کپی دستور نصب"
+                  >
+                    {copiedInstallCmd ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-sky-400" />}
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                 {/* Option 1: 1-Click BAT Launcher */}
                 <div className="p-4 rounded-xl bg-[#18181D] border border-neutral-700/80 hover:border-blue-500/50 transition-all flex flex-col justify-between space-y-3">
