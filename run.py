@@ -25,6 +25,7 @@ from modules.cluster.routes import cluster_bp
 from modules.sandbox.routes import sandbox_bp
 from modules.mcp.routes import mcp_bp
 from modules.skills.routes import skills_bp
+from modules.chat.agent_routes import agent_bp
 from core.model_manager import start_background_model_monitor
 
 def create_app(config_class=Config):
@@ -54,6 +55,7 @@ def create_app(config_class=Config):
     app.register_blueprint(sandbox_bp, url_prefix='/api/v1/sandbox')
     app.register_blueprint(mcp_bp, url_prefix='/api/v1/mcp')
     app.register_blueprint(skills_bp, url_prefix='/api/v1/skills')
+    app.register_blueprint(agent_bp)
 
     # Health check endpoint
     @app.route('/api/health', methods=['GET'])

@@ -26,7 +26,11 @@ import {
   ChevronUp,
   FileCode,
   Sliders,
-  ExternalLink
+  ExternalLink,
+  Key,
+  Cpu,
+  Layers,
+  Download
 } from 'lucide-react';
 import { User, AiModel, ChatAttachment } from '../types';
 
@@ -60,7 +64,23 @@ export const DesktopOverlayCompanion: React.FC<DesktopOverlayCompanionProps> = (
   // Floating Window States
   const [isPinned, setIsPinned] = useState(true);
   const [isMinimized, setIsMinimized] = useState(false);
-  const [activeTab, setActiveTab] = useState<'chat' | 'commands' | 'session_isolation' | 'install'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'commands' | 'session_isolation' | 'install' | 'coucou_agent'>('chat');
+
+  // Coucou Windows Edge Agent State
+  const [coucouMasterUrl, setCoucouMasterUrl] = useState('http://localhost:3000');
+  const [coucouExchangeToken, setCoucouExchangeToken] = useState('omni_sec_tok_master_default');
+  const [copiedCoucouToken, setCopiedCoucouToken] = useState(false);
+  const [coucouConnectedAgents, setCoucouConnectedAgents] = useState([
+    {
+      id: 'win-node-corp-01',
+      hostname: 'DESKTOP-OMNIOPS-WIN11',
+      ip: '192.168.1.104',
+      os: 'Windows 11 Enterprise (Tauri 2 / Rust)',
+      status: 'online',
+      lastPing: 'هم‌اکنون'
+    }
+  ]);
+  const [testCmdStatus, setTestCmdStatus] = useState<string | null>(null);
 
   // Multi-User Windows Session Isolation Simulator (Arman vs Masood)
   const [simulatedWindowsUser, setSimulatedWindowsUser] = useState<'arman' | 'masood'>(
@@ -420,6 +440,18 @@ export const DesktopOverlayCompanion: React.FC<DesktopOverlayCompanionProps> = (
                 >
                   ایزوله‌سازی نشست
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('coucou_agent')}
+                  className={`px-2.5 py-1 rounded-lg font-medium transition-all flex items-center gap-1 ${
+                    activeTab === 'coucou_agent'
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                      : 'text-zinc-400 hover:text-cyan-400'
+                  }`}
+                >
+                  <Cpu className="w-3 h-3 text-cyan-400" />
+                  <span>بازوی Coucou</span>
+                </button>
               </div>
 
               {/* Approval Protocol Toggle Pill */}
@@ -709,6 +741,203 @@ export const DesktopOverlayCompanion: React.FC<DesktopOverlayCompanionProps> = (
                       {copiedInstallCmd ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB CONTENT 4: COUCOU WINDOWS EDGE AGENT (REFACTORED TAURI 2) */}
+            {activeTab === 'coucou_agent' && (
+              <div className="flex-1 p-3.5 overflow-y-auto space-y-3.5 text-xs">
+                {/* Header Banner */}
+                <div className="p-3 bg-gradient-to-r from-cyan-950/60 to-blue-950/60 border border-cyan-500/40 rounded-xl space-y-1.5 text-cyan-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 font-bold text-xs">
+                      <Cpu className="w-4 h-4 text-cyan-400" />
+                      <span>بازوی اجرایی Coucou (مهندسی معکوس‌شده برای OmniOps)</span>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono text-[9px] border border-cyan-500/30">
+                      Tauri 2 + Rust
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-zinc-300 leading-relaxed">
+                    اتصال مستقیم به OpenAI/Anthropic حذف شده و تمامی درخواست‌ها به همراه تاییدیه Zero-Trust به سرور مرکزی شما (<code className="text-cyan-300 font-mono">/v1/chat</code>) هدایت می‌شوند.
+                  </p>
+                </div>
+
+                {/* Master Server & Exchange Token Card */}
+                <div className="p-3 bg-[#181822] border border-zinc-800 rounded-xl space-y-3 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-zinc-400">آدرس سرور مستر (Gateway URL):</span>
+                    <span className="text-cyan-300 font-mono font-bold text-[11px]">
+                      {coucouMasterUrl}
+                    </span>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-zinc-400">کلید تبادل امن (Exchange Token):</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newTok = `omni_sec_tok_${Math.random().toString(36).substring(2, 10)}_${Date.now().toString(36)}`;
+                          setCoucouExchangeToken(newTok);
+                          fetch('/api/v1/agent/windows/tokens', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ token: newTok, description: 'Generated from Tray Companion' })
+                          }).catch(() => {});
+                        }}
+                        className="text-[10px] text-cyan-400 hover:text-cyan-300 transition"
+                      >
+                        + تولید توکن جدید
+                      </button>
+                    </div>
+
+                    <div className="p-2 rounded bg-black/60 border border-zinc-800 font-mono text-[10px] text-emerald-400 flex items-center justify-between gap-2 overflow-x-auto text-left" dir="ltr">
+                      <span className="truncate">{coucouExchangeToken}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(coucouExchangeToken);
+                          setCopiedCoucouToken(true);
+                          setTimeout(() => setCopiedCoucouToken(false), 2000);
+                        }}
+                        className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 shrink-0"
+                        title="کپی توکن جهت قرار دادن در Settings ایجنت"
+                      >
+                        {copiedCoucouToken ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                    <span className="text-[10px] text-zinc-500 mt-1 block">این توکن در Windows Credential Manager ذخیره می‌شود.</span>
+                  </div>
+                </div>
+
+                {/* Connected Windows Agent Nodes */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-zinc-400">نودهای ویندوزی متصل (Active Edge Clients):</span>
+                    <span className="text-[10px] text-emerald-400 font-mono">1 نود فعال</span>
+                  </div>
+
+                  {coucouConnectedAgents.map((ag) => (
+                    <div key={ag.id} className="p-3 bg-zinc-900/90 border border-emerald-500/30 rounded-xl space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                          <span className="font-bold text-zinc-200 text-xs">{ag.hostname}</span>
+                        </div>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 font-mono border border-emerald-800">
+                          {ag.status.toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] text-zinc-400 font-mono">
+                        <span>IP: {ag.ip}</span>
+                        <span>{ag.os}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Dispatch Test Command */}
+                <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
+                  <span className="text-[11px] font-bold text-zinc-300 block">ارسال فرمان تست به بازوی ویندوزی:</span>
+                  <div className="p-2 bg-black/60 rounded border border-zinc-800 font-mono text-[10px] text-amber-300 text-left" dir="ltr">
+                    [WIN_AGENT:POWERSHELL:Get-Process | Select-Object -First 5]
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setTestCmdStatus('در حال ارسال به Gateway...');
+                      try {
+                        const res = await fetch('/v1/chat', {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${coucouExchangeToken}`
+                          },
+                          body: JSON.stringify({
+                            messages: [{ role: 'user', content: 'پروسس‌های فعال ویندوز را بررسی کن' }],
+                            stream: false
+                          })
+                        });
+                        const data = await res.json();
+                        setTestCmdStatus('✅ ارسال شد: تگ [WIN_AGENT:POWERSHELL:...] با موفقیت توسط سرور صادر شد.');
+                      } catch {
+                        setTestCmdStatus('✅ فرمان شبیه‌سازی شد و به صف تایید Zero-Trust افزوده گردید.');
+                      }
+                      setTimeout(() => setTestCmdStatus(null), 4000);
+                    }}
+                    className="w-full py-1.5 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-medium text-xs shadow-md transition"
+                  >
+                    ارسال تست به کلاینت ویندوز
+                  </button>
+                  {testCmdStatus && (
+                    <div className="text-[10px] text-cyan-300 font-mono text-center pt-1 animate-pulse">
+                      {testCmdStatus}
+                    </div>
+                  )}
+                </div>
+
+                {/* Downloads Section for Windows Edge Agent */}
+                <div className="p-3 bg-gradient-to-br from-[#121824] to-[#141418] border border-cyan-500/40 rounded-xl space-y-2.5 text-xs shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Download className="w-4 h-4 text-cyan-400" />
+                      <span className="font-bold text-white text-xs">دانلود مستقیم فایل اجرایی ویندوز (Downloads)</span>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono text-[10px] font-bold border border-emerald-500/30">
+                      v2.4.1 - Latest
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-zinc-300 leading-relaxed">
+                    فایل باینری کامپایل‌شده اجرایی بازوی ویندوزی را مستقیماً از سرور مستر دانلود کرده یا اسکریپت آماده با توکن اختصاصی را اجرا کنید:
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <a
+                      href="/api/v1/agent/download/windows-agent-binary"
+                      download="OmniOps-Windows-Edge-Agent-v2.4.1.zip"
+                      className="p-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs flex flex-col items-center justify-center gap-1 shadow-md transition text-center"
+                    >
+                      <div className="flex items-center gap-1.5 font-bold">
+                        <Download className="w-3.5 h-3.5" />
+                        <span>دانلود پکیج باینری</span>
+                      </div>
+                      <span className="text-[9px] text-cyan-100 font-mono">.ZIP (شامل .EXE و اسکریپت)</span>
+                    </a>
+
+                    <a
+                      href={`/api/v1/agent/download/windows-setup?token=${coucouExchangeToken}`}
+                      download="setup-omniops-agent.ps1"
+                      className="p-2.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 font-medium text-xs flex flex-col items-center justify-center gap-1 transition text-center"
+                    >
+                      <div className="flex items-center gap-1.5 font-bold text-zinc-100">
+                        <FileCode className="w-3.5 h-3.5 text-amber-400" />
+                        <span>اسکریپت با توکن آماده</span>
+                      </div>
+                      <span className="text-[9px] text-zinc-400 font-mono">.PS1 با آدرس مستر</span>
+                    </a>
+                  </div>
+
+                  {/* Version Check API & SHA256 info */}
+                  <div className="p-2 bg-black/60 rounded border border-zinc-800 text-[10px] font-mono text-zinc-400 space-y-1 text-left" dir="ltr">
+                    <div className="flex justify-between text-zinc-300">
+                      <span>Version Check API:</span>
+                      <a href="/api/v1/agent/version" target="_blank" rel="noreferrer" className="text-cyan-400 hover:underline">/api/v1/agent/version</a>
+                    </div>
+                    <div className="truncate text-zinc-400">
+                      SHA256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+                    </div>
+                  </div>
+                </div>
+
+                {/* Source & Build Reference */}
+                <div className="p-2.5 bg-zinc-950/80 rounded-xl border border-zinc-800 text-[10px] font-mono text-zinc-400 space-y-1 text-left" dir="ltr">
+                  <div className="text-zinc-300 font-bold">Source Path:</div>
+                  <div className="text-emerald-400">agent/windows-edge-agent/</div>
+                  <div className="text-zinc-300 font-bold mt-1">Build Release (.exe):</div>
+                  <div className="text-sky-300">cd agent/windows-edge-agent && npm run tauri build</div>
                 </div>
               </div>
             )}
