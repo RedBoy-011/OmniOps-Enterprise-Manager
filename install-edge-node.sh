@@ -32,7 +32,7 @@ if ! command -v python3 >/dev/null 2>&1; then
     echo -e "${COLOR_YELLOW}[*] پایتون ۳ یافت نشد. در حال نصب پایتون و ابزارهای سیستمی...${COLOR_RESET}"
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq
-    apt-get install -y -qq python3 python3-pip python3-venv curl wget ca-certificates >/dev/null 2>&1
+    apt-get install -y -qq python3 python3-pip python3-venv python3-rich curl wget ca-certificates >/dev/null 2>&1
 fi
 
 # 3. Setup temporary isolated workspace for Python TUI
@@ -45,9 +45,10 @@ echo -e "${COLOR_CYAN}[2/3] آماده‌سازی محیط تعاملی گراف
 if ! python3 -c "import rich" >/dev/null 2>&1; then
     echo -e "${COLOR_YELLOW}[*] در حال نصب بسته‌های بهینه‌ساز رابط کاربری CLI...${COLOR_RESET}"
     # Use pip with break-system-packages or venv
+    pip3 install --default-timeout=120 -i https://mirrors.aliyun.com/pypi/simple/ rich --break-system-packages --quiet 2>/dev/null || \
     pip3 install rich --break-system-packages --quiet 2>/dev/null || \
     pip3 install rich --quiet 2>/dev/null || \
-    (python3 -m venv "$WORKDIR/venv" && "$WORKDIR/venv/bin/pip" install rich --quiet) || true
+    (python3 -m venv --system-site-packages "$WORKDIR/venv" && "$WORKDIR/venv/bin/pip" install --default-timeout=120 -i https://mirrors.aliyun.com/pypi/simple/ rich --quiet) || true
 fi
 
 PYTHON_BIN="python3"

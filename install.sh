@@ -104,8 +104,18 @@ read -p "لطفاً پورت اجرای سرویس را وارد کنید [پی�
 PORT=${USER_PORT:-8080}
 echo -e "${COLOR_GREEN}[*] پورت انتخاب شده: $PORT${COLOR_RESET}"
 
+# بررسی و اصلاح هوشمند DNS در صورت وجود اختلال شبکه
+echo -e "\n${COLOR_CYAN}[*] بررسی صحت اتصال شبکه و اعتبارسنجی DNS سرور...${COLOR_RESET}"
+if ! getent hosts files.pythonhosted.org >/dev/null 2>&1 && ! getent hosts pypi.org >/dev/null 2>&1; then
+    echo -e "${COLOR_YELLOW}[!] اخطار: اختلال در DNS سرور مشاهده شد (Temporary failure in name resolution).${COLOR_RESET}"
+    echo -e "${COLOR_GREEN}[*] در حال اعمال خودکار DNSهای معتبر بین‌المللی و ضدتحریم (8.8.8.8 / 1.1.1.1 / Shecan)...${COLOR_RESET}"
+    sudo bash -c 'echo -e "nameserver 8.8.8.8\nnameserver 1.1.1.1\nnameserver 185.51.200.2\nnameserver 178.22.122.100" > /etc/resolv.conf' 2>/dev/null || true
+fi
+
 echo -e "\n${COLOR_BLUE}[2/5] در حال به‌روزرسانی مخازن سیستم و نصب پیش‌نیازها...${COLOR_RESET}"
 sudo apt-get update -y
+sudo apt-get install -y python3 python3-pip python3-venv git curl sqlite3 wireguard-tools \
+    python3-flask python3-requests python3-sqlalchemy 2>/dev/null || \
 sudo apt-get install -y python3 python3-pip python3-venv git curl sqlite3 wireguard-tools
 
 # نصب اختیاری داکر در صورت عدم وجود برای Dify و n8n و Ollama
@@ -117,10 +127,15 @@ if ! command -v docker &> /dev/null; then
 fi
 
 echo -e "\n${COLOR_BLUE}[4/5] ساخت محیط مجازی پایتون و نصب وابستگی‌ها...${COLOR_RESET}"
-python3 -m venv venv
+# استفاده از پکیج‌های سیستمی جهت سرعت‌بخشی و عدم نیاز به دانلود دوباره
+python3 -m venv --system-site-packages venv
 source venv/bin/activate
-pip install --upgrade pip
-pip install flask flask-cors pyjwt requests sqlalchemy
+
+# نصب بسته‌های پایتون با میرورهای پرسرعت و پایدار (جلوگیری از Read Timeout در شبکه ایران)
+echo -e "${COLOR_GREEN}[*] در حال نصب بسته‌های پایتون (Flask, PyJWT, Requests, SQLAlchemy) با میرور پرسرعت...${COLOR_RESET}"
+pip install --default-timeout=120 -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com flask flask-cors pyjwt requests sqlalchemy 2>/dev/null || \
+pip install --default-timeout=120 -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn flask flask-cors pyjwt requests sqlalchemy 2>/dev/null || \
+pip install --default-timeout=120 flask flask-cors pyjwt requests sqlalchemy --trusted-host pypi.org --trusted-host files.pythonhosted.org
 
 echo -e "\n${COLOR_BLUE}[5/5] ایجاد سرویس systemd جهت اجرای مداوم در بک‌گراند...${COLOR_RESET}"
 SERVICE_FILE="/etc/systemd/system/omniops.service"

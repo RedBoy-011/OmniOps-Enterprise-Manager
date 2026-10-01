@@ -79,6 +79,12 @@ echo -e "----------------------------------------------------------"
 # فاز ۲: نصب Docker و موتور استنتاج Ollama برای پردازش‌های سنگین
 # ==============================================================================
 echo -e "\n${COLOR_BLUE}[2/4] نصب بسته‌های مورد نیاز و موتور اولاما روی نود کمکی...${COLOR_RESET}"
+
+# بررسی و اصلاح هوشمند DNS
+if ! getent hosts get.docker.com >/dev/null 2>&1; then
+    sudo bash -c 'echo -e "nameserver 8.8.8.8\nnameserver 1.1.1.1\nnameserver 185.51.200.2" > /etc/resolv.conf' 2>/dev/null || true
+fi
+
 sudo apt-get update -y
 sudo apt-get install -y curl jq wireguard-tools
 
