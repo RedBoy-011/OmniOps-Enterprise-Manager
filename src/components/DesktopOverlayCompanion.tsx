@@ -30,9 +30,13 @@ import {
   Key,
   Cpu,
   Layers,
-  Download
+  Download,
+  Lock,
+  Zap,
+  Phone
 } from 'lucide-react';
 import { User, AiModel, ChatAttachment } from '../types';
+import { VolatilePairingFloatingModal } from './VolatilePairingFloatingModal';
 
 export interface DesktopOverlayCompanionProps {
   currentUser: User | null;
@@ -81,6 +85,32 @@ export const DesktopOverlayCompanion: React.FC<DesktopOverlayCompanionProps> = (
     }
   ]);
   const [testCmdStatus, setTestCmdStatus] = useState<string | null>(null);
+
+  // Volatile 6-digit Session PIN state baraye pairing-e RAM-Only
+  const [volatilePin, setVolatilePin] = useState<string | null>('749201');
+  const [isVolatilePinLoading, setIsVolatilePinLoading] = useState(false);
+  const [isFloatingPairingOpen, setIsFloatingPairingOpen] = useState(false);
+  const [volatilePairedSession, setVolatilePairedSession] = useState<any>(null);
+
+  // Tabeye tolid-e kode 6 raghamie jadid az server
+  const handleGenerateVolatilePin = async () => {
+    setIsVolatilePinLoading(true);
+    try {
+      const res = await fetch('/api/v1/agent/pair/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: currentUser?.username || 'arman' })
+      });
+      const data = await res.json();
+      if (data.pairing_code) {
+        setVolatilePin(data.pairing_code);
+      }
+    } catch (err) {
+      console.error('Khataye tolid pin:', err);
+    } finally {
+      setIsVolatilePinLoading(false);
+    }
+  };
 
   // Multi-User Windows Session Isolation Simulator (Arman vs Masood)
   const [simulatedWindowsUser, setSimulatedWindowsUser] = useState<'arman' | 'masood'>(
@@ -812,6 +842,54 @@ export const DesktopOverlayCompanion: React.FC<DesktopOverlayCompanionProps> = (
                   </div>
                 </div>
 
+                {/* 🔑 Volatile Pairing Code Architecture (Session PIN Card) */}
+                <div className="p-3.5 bg-gradient-to-br from-[#13131c] to-[#181119] border border-red-500/30 rounded-2xl space-y-3 text-xs shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-lg bg-red-600/20 border border-red-500/40 flex items-center justify-center text-red-400">
+                        <Lock className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <span className="font-bold text-white text-xs block">احراز هویت ناپایدار (Volatile PIN)</span>
+                        <span className="text-[10px] text-zinc-400">تولید کد ۶ رقمی تصادفی جهت اتصال ایجنت ویندوز به RAM</span>
+                      </div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 font-mono text-[9px] border border-red-500/30">
+                      RAM Only
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between bg-black/60 p-3 rounded-xl border border-zinc-800">
+                    <div>
+                      <span className="text-[10px] text-zinc-500 block">کد یکتای نشست (Session PIN):</span>
+                      <div className="text-xl font-black font-mono tracking-widest text-red-400 mt-0.5">
+                        {volatilePin || '------'}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isVolatilePinLoading}
+                      onClick={handleGenerateVolatilePin}
+                      className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-[11px] transition shadow-md flex items-center gap-1.5"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isVolatilePinLoading ? 'animate-spin' : ''}`} />
+                      <span>تولید کد جدید</span>
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] pt-1 border-t border-zinc-800/80">
+                    <span className="text-zinc-400">تست ایجنت ویندوزی شناور (OTP):</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsFloatingPairingOpen(true)}
+                      className="px-3 py-1.5 rounded-xl bg-zinc-850 hover:bg-zinc-800 text-sky-400 hover:text-sky-300 border border-sky-500/40 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                    >
+                      <Zap className="w-3.5 h-3.5 text-sky-400" />
+                      <span>شبیه‌سازی فرم OTP ایجنت</span>
+                    </button>
+                  </div>
+                </div>
+
                 {/* Connected Windows Agent Nodes */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -944,6 +1022,24 @@ export const DesktopOverlayCompanion: React.FC<DesktopOverlayCompanionProps> = (
           </>
         )}
       </div>
+
+      {/* Floating Simulation Window baraye Volatile OTP Agent */}
+      {isFloatingPairingOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
+          <VolatilePairingFloatingModal
+            masterServerUrl={window.location.origin}
+            isLocked={!volatilePairedSession}
+            onClose={() => setIsFloatingPairingOpen(false)}
+            onPairingSuccess={(session) => {
+              setVolatilePairedSession(session);
+              setTimeout(() => setIsFloatingPairingOpen(false), 2000);
+            }}
+            onKillSession={() => {
+              setVolatilePairedSession(null);
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 };

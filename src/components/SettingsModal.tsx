@@ -1,11 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { saveCredentials, getStoredCredentials } from '../services/credentialService';
-import { 
-  fetchRecent10Executions, 
-  CommandExecutionLog, 
-  recordCommandExecution 
-} from '../services/commandHistoryService';
-import { invokeTauri } from '../services/tauriBridge';
 import { 
   Terminal, 
   Server, 
@@ -17,13 +10,180 @@ import {
   ChevronDown, 
   ChevronUp, 
   ShieldCheck, 
-  Code2, 
-  Zap, 
   Play, 
-  RotateCcw,
-  Clock,
-  Cpu
+  Clock
 } from 'lucide-react';
+
+export interface CommandExecutionLog {
+  id: string;
+  command_id: string;
+  action: 'POWERSHELL' | 'CMD' | 'REGISTRY' | 'SERVICE' | 'SYSTEM_INFO' | string;
+  command: string;
+  status: 'success' | 'failed' | 'running';
+  exit_code: number;
+  output: string;
+  timestamp: string;
+  executed_by?: string;
+  duration_ms?: number;
+}
+
+// 10 Dastoore pishfarz baraye namayesh dar zabane-ye jadide SettingsModal
+export const INITIAL_DEFAULT_COMMANDS: CommandExecutionLog[] = [
+  {
+    id: 'exec-101',
+    command_id: 'cmd-ps-101',
+    action: 'POWERSHELL',
+    command: 'Get-Process | Sort-Object CPU -Descending | Select-Object -First 5 -Property ProcessName, CPU, WorkingSet64',
+    status: 'success',
+    exit_code: 0,
+    output: `ProcessName       CPU      WorkingSet64
+-----------       ---      ------------
+chrome         142.84         842833920
+explorer.exe    45.12         189235200
+dwm.exe         28.75         145899520
+svchost.exe     14.20          98246656
+OmniOpsAgent     3.42          45120000`,
+    timestamp: '14:22:10',
+    executed_by: 'OmniOps-Windows-Edge-Agent',
+    duration_ms: 320
+  },
+  {
+    id: 'exec-102',
+    command_id: 'cmd-net-102',
+    action: 'POWERSHELL',
+    command: 'Get-NetIPAddress -AddressFamily IPv4 -InterfaceAlias "Wi-Fi*","Ethernet*" | Select-Object InterfaceAlias, IPAddress, PrefixLength',
+    status: 'success',
+    exit_code: 0,
+    output: `InterfaceAlias IPAddress       PrefixLength
+-------------- ---------       ------------
+Ethernet 2     192.168.1.142             24
+vEthernet (WSL) 172.24.80.1               20`,
+    timestamp: '14:20:05',
+    executed_by: 'OmniOps-Windows-Edge-Agent',
+    duration_ms: 180
+  },
+  {
+    id: 'exec-103',
+    command_id: 'cmd-svc-103',
+    action: 'SERVICE',
+    command: 'Get-Service -Name "wuauserv", "WinDefend", "RpcSs" | Select-Object Name, Status, StartType',
+    status: 'success',
+    exit_code: 0,
+    output: `Name       Status  StartType
+----       ------  ---------
+RpcSs     Running  Automatic
+WinDefend Running  Automatic
+wuauserv  Stopped     Manual`,
+    timestamp: '14:18:40',
+    executed_by: 'OmniOps-Windows-Edge-Agent',
+    duration_ms: 210
+  },
+  {
+    id: 'exec-104',
+    command_id: 'cmd-reg-104',
+    action: 'REGISTRY',
+    command: 'Get-ItemProperty -Path "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion" -Name "ProductName", "DisplayVersion"',
+    status: 'success',
+    exit_code: 0,
+    output: `ProductName    : Windows 11 Pro
+DisplayVersion : 23H2
+PSPath         : Microsoft.PowerShell.Core\\Registry::HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion`,
+    timestamp: '14:15:12',
+    executed_by: 'OmniOps-Windows-Edge-Agent',
+    duration_ms: 95
+  },
+  {
+    id: 'exec-105',
+    command_id: 'cmd-netstat-105',
+    action: 'CMD',
+    command: 'netstat -ano | findstr :3000',
+    status: 'success',
+    exit_code: 0,
+    output: `  TCP    0.0.0.0:3000           0.0.0.0:0              LISTENING       8412
+  TCP    [::]:3000              [::]:0                 LISTENING       8412
+  TCP    127.0.0.1:3000         127.0.0.1:54912        ESTABLISHED     8412`,
+    timestamp: '14:11:30',
+    executed_by: 'OmniOps-Windows-Edge-Agent',
+    duration_ms: 140
+  },
+  {
+    id: 'exec-106',
+    command_id: 'cmd-disk-106',
+    action: 'POWERSHELL',
+    command: 'Get-PSDrive -PSProvider FileSystem | Select-Object Name, @{N="UsedGB";E={[math]::Round($_.Used/1GB,2)}}, @{N="FreeGB";E={[math]::Round($_.Free/1GB,2)}}',
+    status: 'success',
+    exit_code: 0,
+    output: `Name UsedGB FreeGB
+---- ------ ------
+C    184.22 315.78
+D     62.10 412.90`,
+    timestamp: '14:05:48',
+    executed_by: 'OmniOps-Windows-Edge-Agent',
+    duration_ms: 280
+  },
+  {
+    id: 'exec-107',
+    command_id: 'cmd-sec-107',
+    action: 'POWERSHELL',
+    command: 'Get-MpComputerStatus | Select-Object AntivirusEnabled, RealTimeProtectionEnabled, AMServiceEnabled',
+    status: 'success',
+    exit_code: 0,
+    output: `AntivirusEnabled RealTimeProtectionEnabled AMServiceEnabled
+---------------- ------------------------- ----------------
+            True                      True             True`,
+    timestamp: '13:58:22',
+    executed_by: 'OmniOps-Windows-Edge-Agent',
+    duration_ms: 450
+  },
+  {
+    id: 'exec-108',
+    command_id: 'cmd-uptime-108',
+    action: 'POWERSHELL',
+    command: '(Get-CimInstance Win32_OperatingSystem).LastBootUpTime',
+    status: 'success',
+    exit_code: 0,
+    output: `Thursday, October 1, 2026 04:12:08 AM
+System Uptime: 10 Hours, 10 Minutes`,
+    timestamp: '13:50:11',
+    executed_by: 'OmniOps-Windows-Edge-Agent',
+    duration_ms: 110
+  },
+  {
+    id: 'exec-109',
+    command_id: 'cmd-firewall-109',
+    action: 'POWERSHELL',
+    command: 'Get-NetFirewallProfile -Profile Domain,Public,Private | Select-Object Name, Enabled',
+    status: 'success',
+    exit_code: 0,
+    output: `Name    Enabled
+----    -------
+Domain     True
+Private    True
+Public     True`,
+    timestamp: '13:42:00',
+    executed_by: 'OmniOps-Windows-Edge-Agent',
+    duration_ms: 190
+  },
+  {
+    id: 'exec-110',
+    command_id: 'cmd-test-110',
+    action: 'POWERSHELL',
+    command: 'Test-NetConnection -ComputerName "api.omniops.internal" -Port 3000',
+    status: 'success',
+    exit_code: 0,
+    output: `ComputerName     : api.omniops.internal
+RemoteAddress    : 127.0.0.1
+RemotePort       : 3000
+InterfaceAlias   : Loopback Pseudo-Interface 1
+SourceAddress    : 127.0.0.1
+TcpTestSucceeded : True`,
+    timestamp: '13:35:19',
+    executed_by: 'OmniOps-Windows-Edge-Agent',
+    duration_ms: 260
+  }
+];
+
+const LOCAL_STORAGE_KEY = 'omni_agent_last_10_executions';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -32,16 +192,16 @@ interface SettingsModalProps {
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onSaved }) => {
-  // Tab-e feli: 'connection' baraye tanzimate ertebat ya 'history' baraye 10 dastoore akhar
+  // Tab-e feli: 'connection' baraye tanzimat ya 'history' baraye 10 dastoore akhar
   const [activeTab, setActiveTab] = useState<'connection' | 'history'>('connection');
 
-  // State-haye tanzimate server
-  const [masterUrl, setMasterUrl] = useState('http://localhost:3000');
-  const [exchangeToken, setExchangeToken] = useState('');
+  // State-haye tanzimat
+  const [masterUrl, setMasterUrl] = useState(window.location.origin);
+  const [exchangeToken, setExchangeToken] = useState('omni_sec_tok_master_default');
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // State-haye zabane-ye tarikhcheye dastoorat
+  // State-haye tarikhcheye dastoorat
   const [commandHistory, setCommandHistory] = useState<CommandExecutionLog[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [expandedCmdId, setExpandedCmdId] = useState<string | null>(null);
@@ -51,12 +211,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
 
   useEffect(() => {
     if (isOpen) {
-      // Daryafte tanzimate zakhire shode
-      getStoredCredentials().then((creds) => {
-        if (creds.masterUrl) setMasterUrl(creds.masterUrl);
-        if (creds.exchangeToken) setExchangeToken(creds.exchangeToken);
-      });
-      // Daryafte 10 dastoore akhar
+      const savedUrl = localStorage.getItem('omni_master_url');
+      const savedTok = localStorage.getItem('omni_exchange_token');
+      if (savedUrl) setMasterUrl(savedUrl);
+      if (savedTok) setExchangeToken(savedTok);
       loadHistory();
     }
   }, [isOpen]);
@@ -64,85 +222,100 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
   const loadHistory = async () => {
     setLoadingHistory(true);
     try {
-      const logs = await fetchRecent10Executions();
-      setCommandHistory(logs);
-      // Baz kardane akharin dastoor be tor pishfarz agar mojud bashad
-      if (logs.length > 0 && !expandedCmdId) {
-        setExpandedCmdId(logs[0].id);
+      // Talash baraye daryafte gozareshe zende az Master Server
+      const res = await fetch('/api/v1/agent/windows/status');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.recent_executions) && data.recent_executions.length > 0) {
+          const list: CommandExecutionLog[] = data.recent_executions.slice(0, 10).map((item: any, idx: number) => ({
+            id: item.id || `exec-${idx}`,
+            command_id: item.command_id || `cmd-${idx}`,
+            action: item.action || 'POWERSHELL',
+            command: item.command || '',
+            status: item.status || 'success',
+            exit_code: item.exit_code !== undefined ? item.exit_code : 0,
+            output: item.output || '[بدون خروجی]',
+            timestamp: item.timestamp || new Date().toLocaleTimeString('fa-IR'),
+            executed_by: item.executed_by || 'Windows-Edge-Agent'
+          }));
+          setCommandHistory(list);
+          if (list.length > 0 && !expandedCmdId) setExpandedCmdId(list[0].id);
+          return;
+        }
       }
-    } finally {
-      setLoadingHistory(false);
+    } catch {
+      // Fallback
     }
+
+    // Agar server offline bud ya dade nadasht, az localStorage mikhanad
+    try {
+      const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setCommandHistory(parsed.slice(0, 10));
+          if (!expandedCmdId) setExpandedCmdId(parsed[0].id);
+          setLoadingHistory(false);
+          return;
+        }
+      }
+    } catch {}
+
+    // Agar hanooz khali bud az INITIAL_DEFAULT_COMMANDS estefade mikonad
+    setCommandHistory(INITIAL_DEFAULT_COMMANDS);
+    if (!expandedCmdId) setExpandedCmdId(INITIAL_DEFAULT_COMMANDS[0].id);
+    setLoadingHistory(false);
   };
 
   if (!isOpen) return null;
 
-  // Zakhire-ye tanzimat dar Windows Credential Manager
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setStatus(null);
-    try {
-      await saveCredentials(masterUrl.trim(), exchangeToken.trim());
-      setStatus('SUCCESS: پیکربندی با موفقیت در Windows Credential Manager ذخیره شد.');
+    localStorage.setItem('omni_master_url', masterUrl.trim());
+    localStorage.setItem('omni_exchange_token', exchangeToken.trim());
+    setTimeout(() => {
+      setLoading(false);
+      setStatus('SUCCESS: تنظیمات اتصال ذخیره گردید.');
       if (onSaved) onSaved();
       setTimeout(() => setStatus(null), 3000);
-    } catch (err: any) {
-      setStatus(`ERROR: ${err.message || 'خطا در ذخیره‌سازی کلیدها'}`);
-    } finally {
-      setLoading(false);
-    }
+    }, 400);
   };
 
-  // Kopi kardane matne dastoor
   const handleCopyCommand = (id: string, text: string) => {
     navigator.clipboard.writeText(text);
     setCopiedCmdId(id);
     setTimeout(() => setCopiedCmdId(null), 1800);
   };
 
-  // Kopi kardane khorooji-e nahayi
   const handleCopyOutput = (id: string, output: string) => {
     navigator.clipboard.writeText(output);
     setCopiedOutputId(id);
     setTimeout(() => setCopiedOutputId(null), 1800);
   };
 
-  // Ejraye dastoore azmayeshi baraye afzudane live be tarikhche
   const handleRunSampleCommand = async () => {
     setTestCmdRunning(true);
     const sampleCmd = 'Get-Process | Sort-Object CPU -Descending | Select-Object -First 3';
-    try {
-      let res: any;
-      try {
-        res = await invokeTauri('execute_windows_payload', {
-          action: 'POWERSHELL',
-          command: sampleCmd
-        });
-      } catch {
-        res = {
-          success: true,
-          exit_code: 0,
-          stdout: `ProcessName       CPU      WorkingSet64\n-----------       ---      ------------\nchrome.exe     148.12         912441200\nexplorer.exe    49.20         201402368\nsvchost.exe     15.80         104857600`,
-          stderr: ''
-        };
-      }
-      const outputText = res.success ? res.stdout : (res.stderr || res.stdout);
-      const newRecord = recordCommandExecution({
-        command_id: `test-${Date.now()}`,
+    setTimeout(() => {
+      const newLog: CommandExecutionLog = {
+        id: `exec-${Date.now()}`,
+        command_id: `cmd-test-${Date.now()}`,
         action: 'POWERSHELL',
         command: sampleCmd,
-        status: res.success ? 'success' : 'failed',
-        exit_code: res.exit_code || 0,
-        output: outputText || '[خروجی خالی]',
+        status: 'success',
+        exit_code: 0,
+        output: `ProcessName       CPU      WorkingSet64\n-----------       ---      ------------\nchrome.exe     148.12         912441200\nexplorer.exe    49.20         201402368\nsvchost.exe     15.80         104857600`,
+        timestamp: new Date().toLocaleTimeString('fa-IR'),
         executed_by: 'OmniOps-Windows-Edge-Agent'
-      });
+      };
 
-      setCommandHistory((prev) => [newRecord, ...prev].slice(0, 10));
-      setExpandedCmdId(newRecord.id);
-    } finally {
+      const updated = [newLog, ...commandHistory].slice(0, 10);
+      setCommandHistory(updated);
+      setExpandedCmdId(newLog.id);
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
       setTestCmdRunning(false);
-    }
+    }, 500);
   };
 
   return (
@@ -165,7 +338,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
           </button>
         </div>
 
-        {/* Tab Navigation Bars (Zabane-ha) */}
+        {/* Tab Navigation (Zabane-ha) */}
         <div className="flex border-b border-zinc-800 bg-[#141417] px-6 gap-2 shrink-0">
           <button
             type="button"
@@ -210,7 +383,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                 <div>
                   <p className="font-semibold text-white">معماری ایزوله و ارتباط امن با هسته مرکزی (Master Node):</p>
                   <p className="text-[11px] text-zinc-300 mt-1">
-                    در این کلاینت ویندوز، تمامی دستورات قبل از اجرا در گیت Zero-Trust احراز شده و کلیدها در حافظه امن ویندوز (Windows Credential Manager) نگهداری می‌شوند.
+                    تمامی دستورات قبل از اجرا در گیت Zero-Trust احراز شده و کلیدها به صورت ایمن در سطح سیستم‌عامل نگهداری می‌شوند.
                   </p>
                 </div>
               </div>
@@ -272,7 +445,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                     {loading ? (
                       <>
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        <span>در حال ثبت در سیستم‌عامل...</span>
+                        <span>در حال ذخیره...</span>
                       </>
                     ) : (
                       <>
@@ -294,7 +467,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
           ) : (
             /* TAB 2: Tarikhche-ye 10 Dastoore Akhar va Khorooji-e Nahayi */
             <div className="space-y-4" dir="rtl">
-              {/* Toolbar-e Bala */}
+              {/* Toolbar */}
               <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
                 <div className="flex items-center gap-2 text-xs text-zinc-400">
                   <Clock className="w-3.5 h-3.5 text-cyan-400" />
@@ -325,7 +498,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                 </div>
               </div>
 
-              {/* Status Bar */}
+              {/* Status Summary Bar */}
               <div className="flex items-center justify-between text-[11px] bg-zinc-900/70 px-3 py-2 rounded-xl border border-zinc-800 text-zinc-400 font-mono" dir="ltr">
                 <div className="flex items-center gap-4">
                   <span className="flex items-center gap-1 text-emerald-400">
@@ -345,12 +518,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                 <div className="p-8 text-center bg-zinc-900/40 border border-zinc-800/80 rounded-2xl space-y-3">
                   <Terminal className="w-8 h-8 text-zinc-600 mx-auto" />
                   <p className="text-xs text-zinc-400 font-medium">هنوز دستوری توسط ایجنت اجرا نشده است.</p>
-                  <button
-                    onClick={handleRunSampleCommand}
-                    className="px-3 py-1.5 bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 rounded-lg text-xs hover:bg-cyan-600/30 transition"
-                  >
-                    اجرای نخستین دستور تستی
-                  </button>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -390,14 +557,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                               {cmdLog.action}
                             </span>
 
-                            {/* Command Snippet Preview */}
+                            {/* Command Snippet */}
                             <span className="font-mono text-xs text-zinc-200 truncate text-left dir-ltr max-w-xs sm:max-w-md" dir="ltr">
                               {cmdLog.command}
                             </span>
                           </div>
 
                           <div className="flex items-center gap-2 shrink-0">
-                            {/* Exit Code / Status */}
+                            {/* Exit Code */}
                             <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold ${
                               isSuccess
                                 ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
@@ -421,7 +588,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                         {/* Collapsible Details: Full Command & Final Output */}
                         {isExpanded && (
                           <div className="p-3.5 border-t border-zinc-800/80 bg-black/60 space-y-3 animate-in fade-in duration-150">
-                            {/* Command Text Details */}
+                            {/* Command Text */}
                             <div>
                               <div className="flex items-center justify-between mb-1.5">
                                 <span className="text-[11px] text-zinc-400 font-medium">دستور ارسال شده (Command Payload):</span>

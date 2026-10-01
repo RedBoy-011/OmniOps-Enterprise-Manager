@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ParsedCommand } from '../services/commandParser';
 import { getStoredCredentials } from '../services/credentialService';
 import { invokeTauri } from '../services/tauriBridge';
+import { recordCommandExecution } from '../services/commandHistoryService';
 
 interface ApprovalProps {
   pendingCommand: ParsedCommand | null;
@@ -42,6 +43,20 @@ export const CommandApprovalModal: React.FC<ApprovalProps> = ({
 
       const output = res.success ? res.stdout : (res.stderr || res.stdout);
       setExecutionLog(output || '[دستور با موفقیت بدون خروجی اجرا شد]');
+
+      // Zakhire-sazi dar tarikhche-ye 10 dastoore akhar baraye SettingsModal
+      try {
+        recordCommandExecution({
+          command_id: pendingCommand.id,
+          action: pendingCommand.action,
+          command: pendingCommand.command,
+          status: res.success ? 'success' : 'failed',
+          exit_code: res.exit_code !== undefined ? res.exit_code : 0,
+          output: output || '[دستور با موفقیت بدون خروجی اجرا شد]'
+        });
+      } catch (histErr) {
+        console.warn('Khata dar sabte tarikhche:', histErr);
+      }
 
       // Ersale gozaresh (Telemetry Callback) be Master Server-e OmniOps
       try {

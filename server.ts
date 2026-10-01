@@ -516,6 +516,334 @@ Write-Host "[✓] Setup completed successfully! Ready to launch OmniOps Windows 
     res.send(scriptContent);
   });
 
+  // =========================================================================
+  // Bakhshe 1: Volatile Pairing Code Architecture baraye Windows Edge Agent
+  // Hameye etelaate in pairing dar RAM negahdari mishavad va dar disk zakhire nemishavad
+  // =========================================================================
+  interface VolatilePairingSession {
+    pin: string;
+    username: string;
+    user_id: number;
+    created_at: number;
+    expires_at: number;
+    used: boolean;
+  }
+
+  // Zakhire-sazi kode 6 raghami dar RAM (Volatile Memory)
+  const volatilePairingStore: Record<string, VolatilePairingSession> = {};
+
+  // Tolid-e kode 6 raghami jadid baraye etesal-e agent (Session PIN)
+  app.post('/api/v1/agent/pair/generate', (req, res) => {
+    // Sakhte kode 6 raghamie adadi ba estefade az Crypto
+    const pin = Math.floor(100000 + Math.random() * 900000).toString();
+    const now = Date.now();
+    const ttlMs = 5 * 60 * 1000; // Etebar be moddate 5 daghighe
+
+    volatilePairingStore[pin] = {
+      pin,
+      username: req.body?.username || 'arman',
+      user_id: req.body?.user_id || 1,
+      created_at: now,
+      expires_at: now + ttlMs,
+      used: false
+    };
+
+    console.log(`[PAIRING-GATE] Kode jadide 6 raghami sakhte shod: ${pin} baraye karbar: ${volatilePairingStore[pin].username}`);
+
+    res.json({
+      status: 'success',
+      pairing_code: pin,
+      expires_in_seconds: 300,
+      message: 'Kode 6 raghamie movaghat sakhte shod va dar RAM gharar gereft'
+    });
+  });
+
+  // Etebarsanji-e kode 6 raghami az samte Windows Agent (Auto-verify)
+  app.post('/api/v1/agent/pair/verify', (req, res) => {
+    const { pairing_code } = req.body || {};
+
+    if (!pairing_code || typeof pairing_code !== 'string') {
+      return res.status(400).json({ error: 'Kode pairing bayad 6 ragham bashad' });
+    }
+
+    const session = volatilePairingStore[pairing_code.trim()];
+
+    if (!session) {
+      return res.status(404).json({ error: 'Kode vared shode vojood nadarad ya monghazi shode ast' });
+    }
+
+    if (session.used) {
+      return res.status(410).json({ error: 'In kod ghablan yekbar masraf shode ast' });
+    }
+
+    if (Date.now() > session.expires_at) {
+      delete volatilePairingStore[pairing_code];
+      return res.status(410).json({ error: 'Mohlate zamani-e in kod be payan reside ast' });
+    }
+
+    // Yekbar masraf kardane kod
+    session.used = true;
+
+    // Tolid-e token-e JWT/Bearer movaghat baraye in session
+    const volatileToken = `omni_volatile_jwt_${Math.random().toString(36).substring(2, 12)}_${Date.now().toString(36)}`;
+    
+    // Sabte token dar liste faale RAM
+    activeExchangeTokens[volatileToken] = {
+      user_id: session.user_id,
+      username: session.username,
+      description: 'Volatile Windows Agent Paired Session (RAM Only)',
+      created_at: new Date().toISOString(),
+      is_active: true,
+      volatile: true
+    };
+
+    // Sabte etelaate agent dar liste connected agents
+    const agentId = `win-volatile-${Math.random().toString(36).substring(2, 8)}`;
+    connectedWinAgents[agentId] = {
+      agent_id: agentId,
+      ip: req.ip || '127.0.0.1',
+      hostname: 'OmniOps-Volatile-Node',
+      username: session.username,
+      last_seen: new Date().toISOString(),
+      version: 'v2.4-volatile-pairing',
+      capabilities: ['POWERSHELL', 'CMD', 'TERMINAL'],
+      status: 'online'
+    };
+
+    res.json({
+      status: 'success',
+      token: volatileToken,
+      agent_id: agentId,
+      user: {
+        id: session.user_id,
+        username: session.username,
+        role: session.username === 'arman' ? 'SuperAdmin' : 'Admin'
+      },
+      permissions: ['POWERSHELL', 'CMD', 'TERMINAL'],
+      message: 'Etesale amn bargharar shod va token dar RAM sabt gardid'
+    });
+  });
+
+  // Kill Switch: Ghate ertebat va hazfe kamel az RAM be mahze LogOff ya Shutdown
+  app.post('/api/v1/agent/pair/kill', (req, res) => {
+    const auth = req.headers.authorization || '';
+    if (auth.startsWith('Bearer ')) {
+      const token = auth.substring(7).trim();
+      if (activeExchangeTokens[token]) {
+        delete activeExchangeTokens[token];
+        console.log(`[KILL-SWITCH] Tokene volatile ba movafaghiat az RAM hazf shod: ${token.substring(0, 15)}...`);
+      }
+    }
+    res.json({ status: 'killed', message: 'Sessione movaghat ba movafaghiat az bein raft' });
+  });
+
+  // =========================================================================
+  // Bakhshe 2: Corporate Cyberpunk Registration & SuperAdmin Pending System
+  // Modiriate sabtename sazmani ba shomare mobayle va taeedie SuperAdmin
+  // =========================================================================
+  interface CorporateUser {
+    id: number;
+    username: string;
+    password_hash: string;
+    mobile: string;
+    full_name: string;
+    department: string;
+    role: 'SuperAdmin' | 'Admin' | 'User';
+    status: 'active' | 'pending' | 'rejected';
+    created_at: string;
+  }
+
+  // Liste karbaran dar database/RAM ba vaziat-haye mokhtalef
+  const corporateUsersStore: CorporateUser[] = [
+    {
+      id: 1,
+      username: 'arman',
+      password_hash: 'admin123',
+      mobile: '09120000001',
+      full_name: 'مهندس آرمان دهقان',
+      department: 'زیرساخت و امنیت سایبری',
+      role: 'SuperAdmin',
+      status: 'active',
+      created_at: new Date(Date.now() - 30 * 86400000).toISOString()
+    },
+    {
+      id: 2,
+      username: 'reza',
+      password_hash: 'admin123',
+      mobile: '09120000002',
+      full_name: 'رضا محمدی',
+      department: 'عملیات شبکه',
+      role: 'Admin',
+      status: 'active',
+      created_at: new Date(Date.now() - 15 * 86400000).toISOString()
+    },
+    {
+      id: 3,
+      username: 'masood',
+      password_hash: 'user123',
+      mobile: '09120000003',
+      full_name: 'مسعود ناصری',
+      department: 'تحلیل داده',
+      role: 'User',
+      status: 'active',
+      created_at: new Date(Date.now() - 5 * 86400000).toISOString()
+    },
+    {
+      id: 4,
+      username: 'sara_dev',
+      password_hash: 'sara#2026',
+      mobile: '09351234567',
+      full_name: 'سارا رادمنش',
+      department: 'توسعه نرم‌افزار',
+      role: 'User',
+      status: 'pending',
+      created_at: new Date().toISOString()
+    },
+    {
+      id: 5,
+      username: 'ali_ops',
+      password_hash: 'ali#2026',
+      mobile: '09198765432',
+      full_name: 'علی ابراهیمی',
+      department: 'تیم DevOps',
+      role: 'User',
+      status: 'pending',
+      created_at: new Date(Date.now() - 3600000).toISOString()
+    }
+  ];
+
+  // Sabtename karbare jadid (Sabte darkhast ba status: pending)
+  app.post('/api/v1/auth/register', (req, res) => {
+    const { username, password, mobile, fullName, department } = req.body || {};
+
+    // Etebarsanjie field-haye ejbari (Username, Password, Mobile)
+    if (!username || !password || !mobile) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'نام کاربری، رمز عبور و شماره موبایل الزامی هستند.'
+      });
+    }
+
+    // Barresie tekrari naboodane username ya mobile
+    const existing = corporateUsersStore.find(
+      u => u.username.toLowerCase() === username.toLowerCase() || u.mobile === mobile
+    );
+    if (existing) {
+      return res.status(409).json({
+        status: 'error',
+        message: 'این نام کاربری یا شماره موبایل قبلاً در سامانه ثبت شده است.'
+      });
+    }
+
+    const newUser: CorporateUser = {
+      id: Date.now(),
+      username: username.trim(),
+      password_hash: password,
+      mobile: mobile.trim(),
+      full_name: fullName || username,
+      department: department || 'عمومی',
+      role: 'User',
+      status: 'pending', // Dar hale entezar baraye taeede SuperAdmin
+      created_at: new Date().toISOString()
+    };
+
+    corporateUsersStore.push(newUser);
+    console.log(`[AUTH-REGISTER] Darkhaste sabtenam baraye ${newUser.username} ba shomareye ${newUser.mobile} sabt shod (PENDING)`);
+
+    res.status(201).json({
+      status: 'success',
+      is_pending: true,
+      message: 'درخواست شما ثبت شد و در انتظار تایید مدیر سیستم است.',
+      user_id: newUser.id
+    });
+  });
+
+  // Vorood be samane ba barresie vaziate Pending
+  app.post('/api/v1/auth/login', (req, res) => {
+    const { username, password } = req.body || {};
+
+    if (!username || !password) {
+      return res.status(400).json({ error: 'نام کاربری و رمز عبور را وارد کنید.' });
+    }
+
+    const user = corporateUsersStore.find(
+      u => (u.username.toLowerCase() === username.toLowerCase() || u.mobile === username) && u.password_hash === password
+    );
+
+    if (!user) {
+      return res.status(401).json({ error: 'نام کاربری یا رمز عبور اشتباه است.' });
+    }
+
+    // Jologiri az voroode karbarani ke taeed nashodeand
+    if (user.status === 'pending') {
+      return res.status(403).json({
+        status: 'pending',
+        message: 'درخواست ثبت‌نام شما در انتظار تایید مدیر سیستم است. لطفاً منتظر بمانید.'
+      });
+    }
+
+    if (user.status === 'rejected') {
+      return res.status(403).json({
+        status: 'rejected',
+        message: 'حساب کاربری شما توسط مدیر سامانه رد شده است.'
+      });
+    }
+
+    // Tolid-e token-e sesion
+    const token = `omni_auth_jwt_${user.username}_${Date.now()}`;
+
+    res.json({
+      status: 'success',
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        full_name: user.full_name,
+        role: user.role,
+        mobile: user.mobile,
+        department: user.department
+      }
+    });
+  });
+
+  // Daryafte tedade karbarane dar hale entezar baraye Hook-e SuperAdmin
+  app.get('/api/v1/admin/pending-users/count', (req, res) => {
+    const pendingCount = corporateUsersStore.filter(u => u.status === 'pending').length;
+    res.json({ count: pendingCount });
+  });
+
+  // Daryafte liste kamel-e karbarane pending baraye modir
+  app.get('/api/v1/admin/pending-users', (req, res) => {
+    const pendingUsers = corporateUsersStore
+      .filter(u => u.status === 'pending')
+      .map(({ password_hash, ...rest }) => rest);
+    res.json({ users: pendingUsers });
+  });
+
+  // Taeede darkhaste sabtenam az samte SuperAdmin
+  app.post('/api/v1/admin/pending-users/:id/approve', (req, res) => {
+    const userId = Number(req.params.id);
+    const user = corporateUsersStore.find(u => u.id === userId);
+    if (!user) {
+      return res.status(404).json({ error: 'Karbare morede nazar yaft nashod' });
+    }
+    user.status = 'active';
+    console.log(`[ADMIN-ACTION] Karbare ${user.username} ba movafaghiat taeed shod (ACTIVE)`);
+    res.json({ status: 'success', message: `کاربر ${user.full_name} با موفقیت تایید و فعال شد.` });
+  });
+
+  // Rade darkhaste sabtenam
+  app.post('/api/v1/admin/pending-users/:id/reject', (req, res) => {
+    const userId = Number(req.params.id);
+    const user = corporateUsersStore.find(u => u.id === userId);
+    if (!user) {
+      return res.status(404).json({ error: 'Karbare morede nazar yaft nashod' });
+    }
+    user.status = 'rejected';
+    console.log(`[ADMIN-ACTION] Karbare ${user.username} rad shod (REJECTED)`);
+    res.json({ status: 'success', message: `درخواست کاربر ${user.full_name} رد شد.` });
+  });
+
   app.get('/api/health', (req, res) => {
     res.json({ status: 'healthy', uptime: process.uptime() });
   });

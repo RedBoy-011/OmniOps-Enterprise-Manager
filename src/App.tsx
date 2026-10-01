@@ -28,6 +28,8 @@ import { ServerManagementModule } from './components/ServerManagementModule';
 import { McpRulesManagerModal } from './components/McpRulesManagerModal';
 import { DesktopOverlayCompanion } from './components/DesktopOverlayCompanion';
 import { MinimalistAiOsView } from './components/MinimalistAiOsView';
+import { CyberpunkSlidingAuthModal } from './components/CyberpunkSlidingAuthModal';
+import { PendingUsersToastNotification } from './components/PendingUsersToastNotification';
 import { 
   Shield, 
   MessageSquare, 
@@ -57,6 +59,7 @@ export default function App() {
   const [agentRunning, setAgentRunning] = useState<boolean>(true);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isDesktopOverlayOpen, setIsDesktopOverlayOpen] = useState(false);
+  const [isCyberAuthModalOpen, setIsCyberAuthModalOpen] = useState(false);
 
   // Raw Installation & Setup State
   const [isInstalled, setIsInstalled] = useState<boolean>(() => {
@@ -2187,6 +2190,7 @@ Try {
                   setCurrentUser(null);
                   setActiveTab('chat');
                   setIsProfileModalOpen(false);
+                  setIsCyberAuthModalOpen(true);
                 }}
                 className="px-3 py-1.5 rounded-xl bg-red-600/20 hover:bg-red-600/30 text-red-300 text-xs font-medium border border-red-500/30 transition-colors mr-auto"
               >
@@ -2196,6 +2200,19 @@ Try {
           </div>
         </div>
       )}
+
+      {/* 🔐 Corporate Cyberpunk Sliding Glassmorphism Auth Modal */}
+      <CyberpunkSlidingAuthModal
+        isOpen={isCyberAuthModalOpen}
+        onClose={() => setIsCyberAuthModalOpen(false)}
+        onLoginSuccess={(user) => {
+          setCurrentUser(user);
+          setIsCyberAuthModalOpen(false);
+        }}
+      />
+
+      {/* 🔔 SuperAdmin Floating Toast for Pending Registrations */}
+      <PendingUsersToastNotification currentUser={currentUser} />
 
       {/* 🛡️ Model Context Protocol (MCP) & Doctrinal Rules Gate Manager Modal */}
       <McpRulesManagerModal

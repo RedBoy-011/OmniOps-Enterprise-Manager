@@ -220,3 +220,212 @@ Write-Host "[✓] Setup completed successfully! Ready to launch OmniOps Windows 
         headers={"Content-Disposition": "attachment; filename=setup-omniops-agent.ps1"}
     )
 
+# =========================================================================
+# Bakhshe 1: Volatile Pairing Code Architecture (RAM Only) dar Python
+# Hameye comment-ha be zabane Finglish neveshte shodeand
+# =========================================================================
+VOLATILE_PAIRING_STORE = {}
+
+@agent_bp.route('/api/v1/agent/pair/generate', methods=['POST'])
+def generate_volatile_pin():
+    # Sakhte kode 6 raghamie adadi
+    pin = str(random.randint(100000, 999999))
+    now = time.time()
+    data = request.get_json(silent=True) or {}
+    username = data.get('username', 'arman')
+
+    VOLATILE_PAIRING_STORE[pin] = {
+        "pin": pin,
+        "username": username,
+        "user_id": 1,
+        "created_at": now,
+        "expires_at": now + 300, # 5 daghighe mohlat
+        "used": False
+    }
+
+    return jsonify({
+        "status": "success",
+        "pairing_code": pin,
+        "expires_in_seconds": 300,
+        "message": "Kode 6 raghamie movaghat dar RAM sakhte shod"
+    })
+
+@agent_bp.route('/api/v1/agent/pair/verify', methods=['POST'])
+def verify_volatile_pin():
+    data = request.get_json(silent=True) or {}
+    pin = str(data.get('pairing_code', '')).strip()
+
+    session = VOLATILE_PAIRING_STORE.get(pin)
+    if not session:
+        return jsonify({"error": "Kode vared shode yaft nashod ya monghazi shode"}), 404
+
+    if session["used"]:
+        return jsonify({"error": "In kod ghablan yekbar masraf shode ast"}), 410
+
+    if time.time() > session["expires_at"]:
+        del VOLATILE_PAIRING_STORE[pin]
+        return jsonify({"error": "Mohlate zamani-e in kod be payan reside ast"}), 410
+
+    session["used"] = True
+    token = f"omni_volatile_jwt_{uuid.uuid4().hex[:12]}_{int(time.time())}"
+
+    ACTIVE_EXCHANGE_TOKENS[token] = {
+        "user_id": session["user_id"],
+        "username": session["username"],
+        "description": "Volatile Windows Agent Paired Session (RAM Only)",
+        "created_at": time.time(),
+        "is_active": True,
+        "volatile": True
+    }
+
+    agent_id = f"win-volatile-{uuid.uuid4().hex[:8]}"
+    CONNECTED_WIN_AGENTS[agent_id] = {
+        "agent_id": agent_id,
+        "ip": request.remote_addr or "127.0.0.1",
+        "hostname": "OmniOps-Volatile-Node",
+        "username": session["username"],
+        "last_seen": time.strftime('%Y-%m-%d %H:%M:%S'),
+        "version": "v2.4-volatile-pairing",
+        "capabilities": ["POWERSHELL", "CMD", "TERMINAL"],
+        "status": "online"
+    }
+
+    return jsonify({
+        "status": "success",
+        "token": token,
+        "agent_id": agent_id,
+        "user": {
+            "id": session["user_id"],
+            "username": session["username"],
+            "role": "SuperAdmin" if session["username"] == "arman" else "Admin"
+        },
+        "permissions": ["POWERSHELL", "CMD", "TERMINAL"],
+        "message": "Etesale amn bargharar shod va token dar RAM sabt gardid"
+    })
+
+@agent_bp.route('/api/v1/agent/pair/kill', methods=['POST'])
+def kill_volatile_session():
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.startswith('Bearer '):
+        token = auth_header[7:].strip()
+        if token in ACTIVE_EXCHANGE_TOKENS:
+            del ACTIVE_EXCHANGE_TOKENS[token]
+    return jsonify({"status": "killed", "message": "Sessione movaghat az RAM pak shod"})
+
+# =========================================================================
+# Bakhshe 2: Sabtename Sazmani ba Shomareye Mobayle va Taeede SuperAdmin
+# =========================================================================
+CORPORATE_USERS = [
+    {
+        "id": 1,
+        "username": "arman",
+        "password_hash": "admin123",
+        "mobile": "09120000001",
+        "full_name": "مهندس آرمان دهقان",
+        "department": "زیرساخت و امنیت سایبری",
+        "role": "SuperAdmin",
+        "status": "active"
+    },
+    {
+        "id": 4,
+        "username": "sara_dev",
+        "password_hash": "sara#2026",
+        "mobile": "09351234567",
+        "full_name": "سارا رادمنش",
+        "department": "توسعه نرم‌افزار",
+        "role": "User",
+        "status": "pending"
+    }
+]
+
+@agent_bp.route('/api/v1/auth/register', methods=['POST'])
+def register_corporate_user():
+    data = request.get_json(silent=True) or {}
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
+    mobile = data.get('mobile', '').strip()
+
+    if not username or not password or not mobile:
+        return jsonify({"status": "error", "message": "نام کاربری، رمز عبور و شماره موبایل الزامی هستند."}), 400
+
+    for u in CORPORATE_USERS:
+        if u["username"].lower() == username.lower() or u["mobile"] == mobile:
+            return jsonify({"status": "error", "message": "این نام کاربری یا شماره موبایل قبلاً ثبت شده است."}), 409
+
+    new_user = {
+        "id": int(time.time() * 1000),
+        "username": username,
+        "password_hash": password,
+        "mobile": mobile,
+        "full_name": data.get('fullName', username),
+        "department": data.get('department', 'عمومی'),
+        "role": "User",
+        "status": "pending" # Dar hale entezar baraye taeedie SuperAdmin
+    }
+    CORPORATE_USERS.append(new_user)
+
+    return jsonify({
+        "status": "success",
+        "is_pending": True,
+        "message": "درخواست شما ثبت شد و در انتظار تایید مدیر سیستم است.",
+        "user_id": new_user["id"]
+    }), 201
+
+@agent_bp.route('/api/v1/auth/login', methods=['POST'])
+def login_corporate_user():
+    data = request.get_json(silent=True) or {}
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
+
+    user = next((u for u in CORPORATE_USERS if (u["username"].lower() == username.lower() or u["mobile"] == username) and u["password_hash"] == password), None)
+    if not user:
+        return jsonify({"error": "نام کاربری یا رمز عبور اشتباه است."}), 401
+
+    if user["status"] == "pending":
+        return jsonify({"status": "pending", "message": "درخواست ثبت‌نام شما در انتظار تایید مدیر سیستم است."}), 403
+
+    if user["status"] == "rejected":
+        return jsonify({"status": "rejected", "message": "حساب کاربری شما توسط مدیر سامانه رد شده است."}), 403
+
+    return jsonify({
+        "status": "success",
+        "token": f"omni_auth_jwt_{user['username']}_{int(time.time())}",
+        "user": {
+            "id": user["id"],
+            "username": user["username"],
+            "full_name": user["full_name"],
+            "role": user["role"],
+            "mobile": user["mobile"],
+            "department": user["department"]
+        }
+    })
+
+@agent_bp.route('/api/v1/admin/pending-users/count', methods=['GET'])
+def get_pending_users_count():
+    count = sum(1 for u in CORPORATE_USERS if u["status"] == "pending")
+    return jsonify({"count": count})
+
+@agent_bp.route('/api/v1/admin/pending-users', methods=['GET'])
+def list_pending_users():
+    pending = [
+        {"id": u["id"], "username": u["username"], "full_name": u["full_name"], "mobile": u["mobile"], "department": u["department"]}
+        for u in CORPORATE_USERS if u["status"] == "pending"
+    ]
+    return jsonify({"users": pending})
+
+@agent_bp.route('/api/v1/admin/pending-users/<int:user_id>/approve', methods=['POST'])
+def approve_pending_user(user_id):
+    user = next((u for u in CORPORATE_USERS if u["id"] == user_id), None)
+    if not user:
+        return jsonify({"error": "Karbare morede nazar yaft nashod"}), 404
+    user["status"] = "active"
+    return jsonify({"status": "success", "message": f"کاربر {user['full_name']} با موفقیت تایید شد."})
+
+@agent_bp.route('/api/v1/admin/pending-users/<int:user_id>/reject', methods=['POST'])
+def reject_pending_user(user_id):
+    user = next((u for u in CORPORATE_USERS if u["id"] == user_id), None)
+    if not user:
+        return jsonify({"error": "Karbare morede nazar yaft nashod"}), 404
+    user["status"] = "rejected"
+    return jsonify({"status": "success", "message": f"درخواست کاربر {user['full_name']} رد شد."})
+
