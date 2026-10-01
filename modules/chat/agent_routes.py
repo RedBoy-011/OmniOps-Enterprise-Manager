@@ -79,17 +79,22 @@ def edge_chat_gateway():
 
     if stream:
         def generate_sse():
-            yield f"data: {json.dumps({'choices': [{'delta': {'content': 'درخواست از طریق هسته OmniOps پردازش شد.\\n'}}]})}\n\n"
+            chunk1 = json.dumps({'choices': [{'delta': {'content': 'درخواست از طریق هسته OmniOps پردازش شد.\n'}}]})
+            yield f"data: {chunk1}\n\n"
             time.sleep(0.1)
             
             if system_cmd_payload:
-                yield f"data: {json.dumps({'choices': [{'delta': {'content': 'در حال آماده‌سازی فرمان اجرایی سیستمی:\\n'}}]})}\n\n"
+                chunk2 = json.dumps({'choices': [{'delta': {'content': 'در حال آماده‌سازی فرمان اجرایی سیستمی:\n'}}]})
+                yield f"data: {chunk2}\n\n"
                 time.sleep(0.1)
-                yield f"data: {json.dumps({'choices': [{'delta': {'content': f'{system_cmd_payload}\\n'}}]})}\n\n"
+                chunk3 = json.dumps({'choices': [{'delta': {'content': system_cmd_payload + '\n'}}]})
+                yield f"data: {chunk3}\n\n"
                 time.sleep(0.1)
-                yield f"data: {json.dumps({'choices': [{'delta': {'content': 'دستور بالا نیازمند تایید کاربر در پاپ‌آپ Zero-Trust است.'}}]})}\n\n"
+                chunk4 = json.dumps({'choices': [{'delta': {'content': 'دستور بالا نیازمند تایید کاربر در پاپ‌آپ Zero-Trust است.'}}]})
+                yield f"data: {chunk4}\n\n"
             else:
-                yield f"data: {json.dumps({'choices': [{'delta': {'content': f'پاسخ سرور مرکزی OmniOps: دستور شما دریافت شد و بستر اتصال به سیستم‌عامل ویندوز پایدار است.'}}]})}\n\n"
+                chunk_reply = json.dumps({'choices': [{'delta': {'content': 'پاسخ سرور مرکزی OmniOps: دستور شما دریافت شد و بستر اتصال به سیستم‌عامل ویندوز پایدار است.'}}]})
+                yield f"data: {chunk_reply}\n\n"
 
             yield "data: [DONE]\n\n"
 
@@ -180,4 +185,38 @@ def check_agent_version():
         "github_download_url": f"https://github.com/RedBoy-011/OmniOps-Enterprise-Manager/releases/download/v{latest_ver}/OmniOps-Windows-Edge-Agent-v{latest_ver}.zip",
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     })
+
+@agent_bp.route('/api/v1/agent/download/windows-agent-binary', methods=['GET'])
+def download_windows_agent_binary():
+    import os
+    from flask import send_file, redirect
+    zip_path = os.path.join(os.getcwd(), 'public', 'downloads', 'OmniOps-Windows-Edge-Agent-v2.4.1.zip')
+    if os.path.exists(zip_path):
+        return send_file(zip_path, as_attachment=True, download_name='OmniOps-Windows-Edge-Agent-v2.4.1.zip')
+    return redirect('https://github.com/RedBoy-011/OmniOps-Enterprise-Manager/releases/latest')
+
+@agent_bp.route('/api/v1/agent/download/windows-setup', methods=['GET'])
+def download_windows_setup_script():
+    host_url = request.host_url.rstrip('/')
+    token = request.args.get('token', 'omni_sec_tok_master_default')
+    script_content = f"""# OmniOps Dynamic Windows Agent Bootstrapper
+$MasterUrl = "{host_url}"
+$Token = "{token}"
+Write-Host "==========================================================" -ForegroundColor Cyan
+Write-Host "   OmniOps Windows Edge Agent Auto-Provisioning Setup    " -ForegroundColor Yellow
+Write-Host "==========================================================" -ForegroundColor Cyan
+Write-Host "[*] Master URL: $MasterUrl"
+Write-Host "[*] Registering credentials into Windows Credential Manager..."
+
+$UserDir = Join-Path $env:APPDATA "OmniOpsAgent"
+if (-not (Test-Path $UserDir)) {{ New-Item -ItemType Directory -Path $UserDir -Force | Out-Null }}
+@{{ "master_url" = $MasterUrl; "exchange_token" = $Token }} | ConvertTo-Json | Set-Content (Join-Path $UserDir "config.json") -Encoding UTF8
+
+Write-Host "[✓] Setup completed successfully! Ready to launch OmniOps Windows Edge Companion." -ForegroundColor Green
+"""
+    return Response(
+        script_content,
+        mimetype="text/plain; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=setup-omniops-agent.ps1"}
+    )
 
