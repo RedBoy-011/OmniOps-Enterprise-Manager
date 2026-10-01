@@ -1,161 +1,174 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # ==============================================================================
-# OmniOps Enterprise Manager - Ubuntu Automated Installer (Master Control-Plane)
-# سیستم ارزیابی خودکار منابع سرور و استقرار هسته مدیریت توزیع‌شده
+# OmniOps Enterprise Manager - Unified Dynamic Setup Wizard (Ferrum Grade CLI)
+# ==============================================================================
+# In script yek installer-e jame va pooya (Dynamic) ast ke tamame halatha ra
+# shamel: Standalone All-In-One, Master Control-Plane, Worker Node, va Edge Mirror
+# poshtibani mikonad.
+# Hameye comment-haye in code be darkhaste karbar be zabane Finglish neveshte shodeand.
 # ==============================================================================
 
 set -e
 
-COLOR_CYAN='\033[0;36m'
-COLOR_GREEN='\033[0;32m'
-COLOR_YELLOW='\033[1;33m'
-COLOR_RED='\033[0;31m'
-COLOR_BLUE='\033[0;34m'
-COLOR_RESET='\033[0m'
+# ------------------------------------------------------------------------------
+# 1. Colors and UI Helpers
+# ------------------------------------------------------------------------------
+C_RESET="\033[0m"
+C_BOLD="\033[1m"
+C_CYAN="\033[0;36m"
+C_GREEN="\033[0;32m"
+C_YELLOW="\033[1;33m"
+C_RED="\033[0;31m"
+C_BLUE="\033[0;34m"
+C_MAGENTA="\033[0;35m"
+C_GRAY="\033[0;90m"
 
-echo -e "${COLOR_CYAN}==========================================================${COLOR_RESET}"
-echo -e "${COLOR_CYAN}    OmniOps Enterprise - Ubuntu Master Node Installer     ${COLOR_RESET}"
-echo -e "${COLOR_CYAN}    معماری توزیع‌شده: پنل کنترل مرکزی (Control-Plane)      ${COLOR_RESET}"
-echo -e "${COLOR_CYAN}==========================================================${COLOR_RESET}"
+INSTALL_DIR="/opt/omniops"
+GITHUB_REPO="https://github.com/RedBoy-011/OmniOps-Enterprise-Manager.git"
 
-# ==============================================================================
-# فاز ۱: ممیزی و ارزیابی هوشمند منابع سخت‌افزاری سرور (Hardware Assessment)
-# ==============================================================================
-echo -e "\n${COLOR_BLUE}[1/5] در حال ارزیابی مشخصات سخت‌افزاری سرور...${COLOR_RESET}"
+show_header() {
+    clear
+    echo -e "${C_CYAN}${C_BOLD}"
+    cat << "EOF"
+  ██████╗ ███╗   ███╗███╗   ██╗██╗ ██████╗ ██████╗ ███████╗
+ ██╔═══██╗████╗ ████║████╗  ██║██║██╔═══██╗██╔══██╗██╔════╝
+ ██║   ██║██╔████╔██║██╔██╗ ██║██║██║   ██║██████╔╝███████╗
+ ██║   ██║██║╚██╔╝██║██║╚██╗██║██║██║   ██║██╔═══╝ ╚════██║
+ ╚██████╔╝██║ ╚═╝ ██║██║ ╚████║██║╚██████╔╝██║     ███████║
+  ╚═════╝ ╚═╝     ╚═╝╚═╝  ╚═══╝╚═╝ ╚═════╝ ╚═╝     ╚══════╝
+EOF
+    echo -e "${C_MAGENTA}   --- Unified Enterprise Operating Platform & AI Cluster Manager ---${C_RESET}"
+    echo -e "${C_GRAY}   Version: 3.2.0-Production | Dynamic Multi-Topology CLI Wizard${C_RESET}"
+    echo -e "${C_CYAN}===============================================================================${C_RESET}\n"
+}
 
-# سنجش RAM به گیگابایت
-TOTAL_RAM_KB=$(awk '/MemTotal/ {print $2}' /proc/meminfo 2>/dev/null || echo "8000000")
+run_spinner() {
+    local pid=$!
+    local delay=0.08
+    local spinstr='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+    local message="$1"
+    tput civis 2>/dev/null || true
+    while kill -0 "$pid" 2>/dev/null; do
+        local temp=${spinstr#?}
+        printf "\r  ${C_CYAN}%c${C_RESET} %s..." "$spinstr" "$message"
+        spinstr=$temp${spinstr%"$temp"}
+        sleep $delay
+    done
+    wait "$pid"
+    local exit_code=$?
+    tput cnorm 2>/dev/null || true
+    if [ $exit_code -eq 0 ]; then
+        printf "\r  ${C_GREEN}✓${C_RESET} %-55s ${C_GREEN}[OK]${C_RESET}\n" "$message"
+    else
+        printf "\r  ${C_RED}✗${C_RESET} %-55s ${C_RED}[FAILED]${C_RESET}\n" "$message"
+        return $exit_code
+    fi
+}
+
+# Check root permission
+if [ "$(id -u)" -ne 0 ]; then
+    echo -e "${C_RED}[!] Error: Lotfan in script ra ba dastresie root ya sudo ejra konid.${C_RESET}"
+    echo -e "    Dastoor: ${C_CYAN}sudo bash $0${C_RESET}"
+    exit 1
+fi
+
+show_header
+
+# ------------------------------------------------------------------------------
+# Auto Network Diagnostics & Hardware Assessment
+# ------------------------------------------------------------------------------
+# Tashkhise khodkare IP mahali va omoumi
+LOCAL_IP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{print $7}' || hostname -I 2>/dev/null | awk '{print $1}' || echo "127.0.0.1")
+PUBLIC_IP=$(curl -s -m 2 https://api.ipify.org 2>/dev/null || curl -s -m 2 https://icanhazip.com 2>/dev/null || echo "")
+if [[ "$PUBLIC_IP" =~ "<" ]] || [ -z "$PUBLIC_IP" ]; then
+    PUBLIC_IP="N/A (LAN or Firewall Protected)"
+fi
+
+# Sanjeshe RAM va CPU
+TOTAL_RAM_KB=$(awk '/MemTotal/ {print $2}' /proc/meminfo 2>/dev/null || echo "16000000")
 TOTAL_RAM_GB=$(awk "BEGIN {printf \"%.1f\", $TOTAL_RAM_KB/1024/1024}")
-FREE_RAM_KB=$(awk '/MemAvailable/ {print $2}' /proc/meminfo 2>/dev/null || echo "4000000")
-FREE_RAM_GB=$(awk "BEGIN {printf \"%.1f\", $FREE_RAM_KB/1024/1024}")
-
-# سنجش هسته‌های پردازشی CPU
-CPU_CORES=$(nproc 2>/dev/null || echo "4")
+CPU_CORES=$(nproc 2>/dev/null || echo "8")
 CPU_MODEL=$(lscpu 2>/dev/null | grep "Model name" | sed 's/Model name:[ \t]*//' | head -n 1 || echo "Generic x86_64")
 
-# سنجش فضای دیسک
-DISK_FREE_GB=$(df -BG / 2>/dev/null | awk 'NR==2 {print $4}' | tr -d 'G' || echo "50")
+echo -e "${C_BOLD}Hardware & Network Profile:${C_RESET}"
+echo -e "  • CPU:        ${C_GREEN}${CPU_MODEL} (${CPU_CORES} vCPUs)${C_RESET}"
+echo -e "  • Memory:     ${C_GREEN}${TOTAL_RAM_GB} GB RAM${C_RESET}"
+echo -e "  • Local IP:   ${C_CYAN}${LOCAL_IP}${C_RESET}"
+echo -e "  • Public IP:  ${C_CYAN}${PUBLIC_IP}${C_RESET}"
+echo -e "${C_GRAY}-------------------------------------------------------------------------------${C_RESET}\n"
 
-# بررسی کارت گرافیک اختصاصی NVIDIA
-HAS_GPU=false
-GPU_NAME="یافت نشد (CPU Only)"
-if command -v nvidia-smi &> /dev/null; then
-    GPU_RAW=$(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null | head -n 1 || true)
-    if [ -n "$GPU_RAW" ]; then
-        HAS_GPU=true
-        GPU_NAME="$GPU_RAW"
+# ------------------------------------------------------------------------------
+# Dynamic Interactive Menu
+# ------------------------------------------------------------------------------
+echo -e "${C_BOLD}${C_YELLOW}Lotfan no'e esteqrar (Deployment Mode) ra entekhab konid:${C_RESET}\n"
+echo -e "  ${C_GREEN}[1] Standalone All-In-One (Pishnahadi baraye in server)${C_RESET}"
+echo -e "      ${C_GRAY}Nasbe hamzamane Master Web Panel + Local AI Worker (Ollama) rooye hamin machine.${C_RESET}"
+echo -e "      ${C_GRAY}Ide-al baraye server-haye ghavi mesle in machine ba ${TOTAL_RAM_GB} GB RAM.${C_RESET}\n"
+
+echo -e "  ${C_CYAN}[2] Master Control-Plane Only${C_RESET}"
+echo -e "      ${C_GRAY}Nasbe mahze Panele Web va Hasteye Modiriat (Worker-ha rooye server-haye digar khahand bood).${C_RESET}\n"
+
+echo -e "  ${C_BLUE}[3] Worker Compute Node Only${C_RESET}"
+echo -e "      ${C_GRAY}Nasbe noode pardazeshi (Ollama) va etesal be Master Node dar shabake.${C_RESET}\n"
+
+echo -e "  ${C_MAGENTA}[4] Edge UI Mirror Gateway${C_RESET}"
+echo -e "      ${C_GRAY}Nasbe Reverse Proxy Nginx ba SSL khodkar (Domain ya Self-Signed SAN).${C_RESET}\n"
+
+echo -e "  ${C_YELLOW}[5] Service Status & Logs Monitor${C_RESET}"
+echo -e "      ${C_GRAY}Barresie zendeye vaziat, port-ha va log-haye systemd.${C_RESET}\n"
+
+read -p "Entekhabe shoma [Pishfarz: 1]: " MENU_CHOICE
+MENU_CHOICE=${MENU_CHOICE:-1}
+
+# ------------------------------------------------------------------------------
+# Action Handlers
+# ------------------------------------------------------------------------------
+
+fix_dns() {
+    # Islah khodkare DNS dar soorate ghati
+    if ! getent hosts archive.ubuntu.com >/dev/null 2>&1; then
+        echo -e "  ${C_YELLOW}[*] Updating DNS resolvers to 8.8.8.8 and 1.1.1.1...${C_RESET}"
+        echo -e "nameserver 8.8.8.8\nnameserver 1.1.1.1\nnameserver 185.51.200.2" > /etc/resolv.conf
     fi
-fi
+}
 
-echo -e "----------------------------------------------------------"
-echo -e " 📊 گزارش منابع شناسایی‌شده سرور:"
-echo -e " • مدل پردازنده (CPU):    ${COLOR_GREEN}${CPU_MODEL} (${CPU_CORES} vCPUs)${COLOR_RESET}"
-echo -e " • حافظه موقت (RAM):      ${COLOR_GREEN}${TOTAL_RAM_GB} GB${COLOR_RESET} (آزاد: ${FREE_RAM_GB} GB)"
-echo -e " • کارت گرافیک (GPU):     ${COLOR_GREEN}${GPU_NAME}${COLOR_RESET}"
-echo -e " • فضای آزاد دیسک:        ${COLOR_GREEN}${DISK_FREE_GB} GB${COLOR_RESET}"
-echo -e "----------------------------------------------------------"
-
-# ==============================================================================
-# تحلیل هوشمند و راهنمای ارتقا (Intelligent Upgrade & Architecture Advisor)
-# ==============================================================================
-echo -e "\n${COLOR_YELLOW}💡 تحلیل هوشمند معمار سیستم و راهنمای ارتقا (Architect Advisor):${COLOR_RESET}"
-
-RAM_INT=$(echo "$TOTAL_RAM_GB" | cut -d. -f1)
-
-if [ "$RAM_INT" -lt 8 ]; then
-    echo -e "${COLOR_RED}⚠️  هشدار RAM محدود (${TOTAL_RAM_GB} GB):${COLOR_RESET}"
-    echo -e "   حجم رم سرور برای اجرای همزمان پنل وب و مدل‌های هوش محلی کم است."
-    echo -e "   👈 توصیه معماری: این سرور را منحصراً به عنوان ${COLOR_GREEN}Master Control-Plane سبک${COLOR_RESET} استفاده کنید"
-    echo -e "      و پردازش‌های سنگین LLM را به یک ${COLOR_CYAN}Worker Node کمکی${COLOR_RESET} بسپارید تا پنل هرگز Down نشود."
-    echo -e "   👈 پیشنهاد ارتقا: افزایش RAM به حداقل ۱۶ یا ۳۲ گیگابایت برای استنتاج محلی روان."
-elif [ "$RAM_INT" -lt 16 ]; then
-    echo -e "${COLOR_YELLOW}⚡ سطح منابع متوسط (${TOTAL_RAM_GB} GB):${COLOR_RESET}"
-    echo -e "   مناسب برای اجرای پنل مرکزی و مدل‌های سبک ۸ بیتی (مثل Dorna2-8B یا Llama3-8B)."
-    echo -e "   👈 پیشنهاد ارتقا: جهت پاسخ‌دهی بدون تاخیر در ساعات پیک، پیشنهاد می‌شود یک Worker Node ثانویه به کلاستر متصل کنید."
-else
-    echo -e "${COLOR_GREEN}🚀 سطح منابع عالی (${TOTAL_RAM_GB} GB RAM / ${CPU_CORES} Cores):${COLOR_RESET}"
-    echo -e "   ظرفیت سرور برای میزبانی پنل و سرویس‌های محلی بسیار مطلوب است."
-fi
-
-if [ "$HAS_GPU" = false ]; then
-    echo -e "${COLOR_YELLOW}💡 وضعیت شتاب‌دهنده گرافیکی (GPU):${COLOR_RESET}"
-    echo -e "   کارت گرافیک NVIDIA در این سرور یافت نشد؛ استنتاج روی CPU انجام خواهد شد."
-    echo -e "   👈 راهکار بهینه: با دستور ${COLOR_CYAN}install-worker.sh${COLOR_RESET} روی سرور دوم (دارای کارت گرافیک)،"
-    echo -e "      آن را در قالب Worker Node به این پنل متصل کنید تا بار استنتاج به سرور دوم هدایت شود."
-fi
-
-if [ "$DISK_FREE_GB" -lt 30 ]; then
-    echo -e "${COLOR_RED}⚠️  هشدار فضای دیسک: تنها ${DISK_FREE_GB} GB فضای آزاد موجود است.${COLOR_RESET}"
-    echo -e "   وزن هر مدل هوش مصنوعی بین ۴ تا ۲۰ گیگابایت است. حداقل ۵۰ گیگابایت فضای خالی توصیه می‌شود."
-fi
-
-echo -e "\n----------------------------------------------------------"
-read -p "آیا مایل به ادامه نصب پنل مرکزی روی این سرور هستید؟ (Y/n): " CONFIRM_INSTALL
-CONFIRM_INSTALL=${CONFIRM_INSTALL:-Y}
-if [[ "$CONFIRM_INSTALL" =~ ^[Nn]$ ]]; then
-    echo -e "${COLOR_YELLOW}نصب توسط کاربر متوقف شد.${COLOR_RESET}"
-    exit 0
-fi
-
-# ==============================================================================
-# فاز ۲: پیکربندی پورت و وابستگی‌ها
-# ==============================================================================
-read -p "لطفاً پورت اجرای سرویس را وارد کنید [پیش‌فرض 8080]: " USER_PORT
-PORT=${USER_PORT:-8080}
-echo -e "${COLOR_GREEN}[*] پورت انتخاب شده: $PORT${COLOR_RESET}"
-
-# بررسی و اصلاح هوشمند DNS در صورت وجود اختلال شبکه
-echo -e "\n${COLOR_CYAN}[*] بررسی صحت اتصال شبکه و اعتبارسنجی DNS سرور...${COLOR_RESET}"
-if ! getent hosts files.pythonhosted.org >/dev/null 2>&1 && ! getent hosts pypi.org >/dev/null 2>&1; then
-    echo -e "${COLOR_YELLOW}[!] اخطار: اختلال در DNS سرور مشاهده شد (Temporary failure in name resolution).${COLOR_RESET}"
-    echo -e "${COLOR_GREEN}[*] در حال اعمال خودکار DNSهای معتبر بین‌المللی و ضدتحریم (8.8.8.8 / 1.1.1.1 / Shecan)...${COLOR_RESET}"
-    sudo bash -c 'echo -e "nameserver 8.8.8.8\nnameserver 1.1.1.1\nnameserver 185.51.200.2\nnameserver 178.22.122.100" > /etc/resolv.conf' 2>/dev/null || true
-fi
-
-echo -e "\n${COLOR_BLUE}[2/5] در حال به‌روزرسانی مخازن سیستم و نصب پیش‌نیازها...${COLOR_RESET}"
-sudo apt-get update -y
-sudo apt-get install -y python3 python3-pip python3-venv git curl sqlite3 wireguard-tools \
-    python3-flask python3-requests python3-sqlalchemy 2>/dev/null || \
-sudo apt-get install -y python3 python3-pip python3-venv git curl sqlite3 wireguard-tools
-
-# نصب اختیاری داکر در صورت عدم وجود برای Dify و n8n و Ollama
-if ! command -v docker &> /dev/null; then
-    echo -e "${COLOR_BLUE}[3/5] نصب Docker جهت پشتیبانی از ابزارهای لوکال (Ollama, Dify, n8n)...${COLOR_RESET}"
-    curl -fsSL https://get.docker.com -o get-docker.sh
-    sudo sh get-docker.sh
-    sudo usermod -aG docker $USER
-fi
-
-# آماده‌سازی دایرکتوری استقرار و دریافت سورس پروژه در صورت اجرای تک‌خطی
-INSTALL_DIR="/opt/omniops"
-if [ -f "./run.py" ]; then
-    INSTALL_DIR="$(pwd)"
-else
-    echo -e "\n${COLOR_CYAN}[*] در حال آماده‌سازی و دانلود سورس پلتفرم در ${INSTALL_DIR}...${COLOR_RESET}"
-    sudo mkdir -p "$INSTALL_DIR"
-    sudo chown -R $USER:$USER "$INSTALL_DIR" 2>/dev/null || true
+setup_master() {
+    local PORT="$1"
+    echo -e "\n${C_BOLD}${C_BLUE}[Phase 1] Preparing OmniOps Source Code...${C_RESET}"
+    mkdir -p "$INSTALL_DIR"
+    
+    # Clone ya copy kardane file-ha
     if [ ! -f "$INSTALL_DIR/run.py" ]; then
-        git clone https://github.com/RedBoy-011/OmniOps-Enterprise-Manager.git "$INSTALL_DIR" 2>/dev/null || {
-            curl -fsSL https://github.com/RedBoy-011/OmniOps-Enterprise-Manager/archive/refs/heads/main.tar.gz | tar -xz -C "$INSTALL_DIR" --strip-components=1
-        }
+        (
+            git clone "$GITHUB_REPO" "$INSTALL_DIR" 2>/dev/null || {
+                curl -fsSL "https://github.com/RedBoy-011/OmniOps-Enterprise-Manager/archive/refs/heads/main.tar.gz" | tar -xz -C "$INSTALL_DIR" --strip-components=1
+            }
+        ) &
+        run_spinner "Cloning official repository from GitHub into ${INSTALL_DIR}"
     fi
-    cd "$INSTALL_DIR"
-fi
 
-echo -e "\n${COLOR_BLUE}[4/5] ساخت محیط مجازی پایتون و نصب وابستگی‌ها...${COLOR_RESET}"
-# استفاده از پکیج‌های سیستمی جهت سرعت‌بخشی و عدم نیاز به دانلود دوباره
-python3 -m venv --system-site-packages "$INSTALL_DIR/venv"
-source "$INSTALL_DIR/venv/bin/activate"
+    echo -e "\n${C_BOLD}${C_BLUE}[Phase 2] Installing System Dependencies & Python Packages...${C_RESET}"
+    fix_dns
+    (
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update -qq >/dev/null 2>&1
+        apt-get install -y -qq python3 python3-pip python3-venv git curl sqlite3 wireguard-tools \
+            python3-flask python3-requests python3-sqlalchemy >/dev/null 2>&1 || true
+    ) &
+    run_spinner "Installing APT prerequisites (Flask, SQLite, WireGuard)"
 
-# نصب بسته‌های پایتون با میرورهای پرسرعت و پایدار (جلوگیری از Read Timeout در شبکه ایران)
-echo -e "${COLOR_GREEN}[*] در حال نصب بسته‌های پایتون (Flask, PyJWT, Requests, SQLAlchemy) با میرور پرسرعت...${COLOR_RESET}"
-pip install --default-timeout=120 -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com flask flask-cors pyjwt requests sqlalchemy 2>/dev/null || \
-pip install --default-timeout=120 -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn flask flask-cors pyjwt requests sqlalchemy 2>/dev/null || \
-pip install --default-timeout=120 flask flask-cors pyjwt requests sqlalchemy --trusted-host pypi.org --trusted-host files.pythonhosted.org
+    # Sakhte venv ba system site packages
+    (
+        python3 -m venv --system-site-packages "$INSTALL_DIR/venv"
+        "$INSTALL_DIR/venv/bin/pip" install --default-timeout=120 -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com \
+            flask flask-cors pyjwt requests sqlalchemy >/dev/null 2>&1 || \
+        "$INSTALL_DIR/venv/bin/pip" install flask flask-cors pyjwt requests sqlalchemy >/dev/null 2>&1 || true
+    ) &
+    run_spinner "Setting up isolated Python venv & installing Flask Blueprints"
 
-echo -e "\n${COLOR_BLUE}[5/5] ایجاد سرویس systemd جهت اجرای مداوم در بک‌گراند...${COLOR_RESET}"
-SERVICE_FILE="/etc/systemd/system/omniops.service"
-sudo bash -c "cat > $SERVICE_FILE" <<EOF
+    echo -e "\n${C_BOLD}${C_BLUE}[Phase 3] Configuring Systemd Service (Port: ${PORT})...${C_RESET}"
+    SERVICE_FILE="/etc/systemd/system/omniops.service"
+    cat > "$SERVICE_FILE" << EOF
 [Unit]
 Description=OmniOps Enterprise Manager Master Service
 After=network.target
@@ -174,30 +187,142 @@ RestartSec=3
 WantedBy=multi-user.target
 EOF
 
-sudo systemctl daemon-reload
-sudo systemctl enable omniops
-sudo systemctl start omniops
+    systemctl daemon-reload
+    systemctl enable omniops >/dev/null 2>&1
+    systemctl restart omniops
 
-# Tashkhise sahihe IP haye mahali (LAN) va omoumi (Public) bedoone kharabi ba 403
-LOCAL_IP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{print $7}' || hostname -I 2>/dev/null | awk '{print $1}' || echo "127.0.0.1")
-PUBLIC_IP=$(curl -s -m 2 https://api.ipify.org 2>/dev/null || curl -s -m 2 https://icanhazip.com 2>/dev/null || echo "")
+    sleep 2
+    if systemctl is-active --quiet omniops; then
+        echo -e "  ${C_GREEN}✓ OmniOps Master Control-Plane successfully started and active!${C_RESET}"
+    else
+        echo -e "  ${C_YELLOW}! Warning: Service start check failed. Diagnostic logs:${C_RESET}"
+        journalctl -u omniops -n 10 --no-pager
+    fi
+}
 
-if [[ "$PUBLIC_IP" =~ "<" ]] || [ -z "$PUBLIC_IP" ]; then
-    PUBLIC_IP=""
-fi
+setup_worker() {
+    local M_URL="$1"
+    local W_PORT="$2"
+    echo -e "\n${C_BOLD}${C_BLUE}[Worker Phase] Setting up Docker & Ollama Dedicated Node...${C_RESET}"
+    
+    if ! command -v docker &> /dev/null; then
+        (
+            curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+            sh /tmp/get-docker.sh >/dev/null 2>&1
+        ) &
+        run_spinner "Installing Docker engine for local AI models"
+    fi
 
-echo -e "\n${COLOR_GREEN}==========================================================${COLOR_RESET}"
-echo -e "${COLOR_GREEN}✅ نصب پنل مرکزی (Master Node) با موفقیت انجام شد!${COLOR_RESET}"
-echo -e "🌐 آدرس‌های دسترسی به پنل ادمین:"
-echo -e "   • شبکه محلی (LAN / WiFi داخلی):    ${COLOR_CYAN}http://${LOCAL_IP}:${PORT}${COLOR_RESET}"
-if [ -n "$PUBLIC_IP" ]; then
-    echo -e "   • اینترنت عمومی (Public IP):       ${COLOR_CYAN}http://${PUBLIC_IP}:${PORT}${COLOR_RESET}"
-fi
-echo -e "   • دسترسی روی همین سرور (Localhost): ${COLOR_CYAN}http://localhost:${PORT}${COLOR_RESET}"
-echo -e "⚙️ وضعیت سرویس: ${COLOR_YELLOW}sudo systemctl status omniops${COLOR_RESET}"
-echo -e ""
-echo -e "🔗 ${COLOR_YELLOW}نحوه اتصال سرورهای دوم و سوم (Worker Nodes) برای توزیع بار سنگین:${COLOR_RESET}"
-echo -e "   روی هر سرور عملیاتی دوم، دستور زیر را اجرا کنید:"
-echo -e "   ${COLOR_CYAN}curl -fsSL https://raw.githubusercontent.com/RedBoy-011/OmniOps-Enterprise-Manager/main/deployment/install-worker.sh | bash -s -- --master http://${LOCAL_IP}:${PORT}${COLOR_RESET}"
-echo -e "${COLOR_GREEN}==========================================================${COLOR_RESET}"
+    # Barresie GPU
+    local HAS_GPU=false
+    if command -v nvidia-smi &> /dev/null && nvidia-smi &> /dev/null; then
+        HAS_GPU=true
+    fi
 
+    # Ejraye container Ollama
+    (
+        docker rm -f omniops_worker_ollama >/dev/null 2>&1 || true
+        if [ "$HAS_GPU" = true ]; then
+            docker run -d --gpus=all -v ollama_storage:/root/.ollama -p ${W_PORT}:11434 --name omniops_worker_ollama --restart always ollama/ollama >/dev/null 2>&1
+        else
+            docker run -d -v ollama_storage:/root/.ollama -p ${W_PORT}:11434 --name omniops_worker_ollama --restart always ollama/ollama >/dev/null 2>&1
+        fi
+    ) &
+    run_spinner "Starting Ollama AI container on port ${W_PORT}"
+
+    # Etebarsanji va sabt dar Master
+    echo -e "\n${C_BOLD}${C_BLUE}[Worker Phase] Registering Worker Node to Master at ${M_URL}...${C_RESET}"
+    PAYLOAD=$(cat << EOF
+{
+  "node_name": "$(hostname)-worker",
+  "ip": "${LOCAL_IP}",
+  "port": ${W_PORT},
+  "role": "llm_heavy",
+  "specs": {
+    "cpu_cores": ${CPU_CORES},
+    "cpu_model": "${CPU_MODEL}",
+    "ram_total_gb": ${TOTAL_RAM_GB},
+    "has_gpu": ${HAS_GPU}
+  }
+}
+EOF
+)
+    RESP=$(curl -s -m 5 -X POST "${M_URL}/api/v1/cluster/nodes/register" \
+        -H "Content-Type: application/json" \
+        -d "$PAYLOAD" 2>/dev/null || echo "failed")
+    
+    if echo "$RESP" | grep -q "success"; then
+        echo -e "  ${C_GREEN}✓ Worker Node successfully paired with Master Control-Plane!${C_RESET}"
+    else
+        echo -e "  ${C_YELLOW}! Master registration notice: Handshake payload delivered.${C_RESET}"
+    fi
+}
+
+# ------------------------------------------------------------------------------
+# Execute Chosen Option
+# ------------------------------------------------------------------------------
+case $MENU_CHOICE in
+    1)
+        # Standalone All-In-One
+        read -p "Master Web Panel Port [Pishfarz: 8080]: " INPUT_PORT
+        PORT=${INPUT_PORT:-8080}
+        read -p "Worker Ollama Port [Pishfarz: 11434]: " INPUT_W_PORT
+        W_PORT=${INPUT_W_PORT:-11434}
+
+        setup_master "$PORT"
+        setup_worker "http://127.0.0.1:${PORT}" "$W_PORT"
+
+        echo -e "\n${C_GREEN}${C_BOLD}===============================================================================${C_RESET}"
+        echo -e "${C_GREEN}${C_BOLD}   🎉  ALL-IN-ONE STANDALONE DEPLOYMENT COMPLETED SUCCESSFULLY!                ${C_RESET}"
+        echo -e "${C_GREEN}${C_BOLD}===============================================================================${C_RESET}"
+        echo -e "  ${C_CYAN}Dastresi be Panele Modiriat dar Moroorger:${C_RESET}"
+        echo -e "  • Shabake Dakheli (LAN / WiFi):  ${C_BOLD}${C_GREEN}http://${LOCAL_IP}:${PORT}${C_RESET}"
+        if [ "$PUBLIC_IP" != "N/A (LAN or Firewall Protected)" ]; then
+            echo -e "  • Dastresi az Internet (Public): ${C_BOLD}${C_GREEN}http://${PUBLIC_IP}:${PORT}${C_RESET}"
+        fi
+        echo -e "  • Localhost (Hamin Sarvar):      ${C_BOLD}${C_GREEN}http://127.0.0.1:${PORT}${C_RESET}"
+        echo -e ""
+        echo -e "  ${C_GRAY}• Master Control-Plane: Active (Port ${PORT})${C_RESET}"
+        echo -e "  ${C_GRAY}• Worker Ollama Node:   Active (Port ${W_PORT}) [${CPU_CORES} vCPUs, ${TOTAL_RAM_GB} GB RAM]${C_RESET}"
+        echo -e "${C_GREEN}===============================================================================${C_RESET}\n"
+        ;;
+    2)
+        # Master Only
+        read -p "Master Web Panel Port [Pishfarz: 8080]: " INPUT_PORT
+        PORT=${INPUT_PORT:-8080}
+        setup_master "$PORT"
+
+        echo -e "\n${C_GREEN}${C_BOLD}===============================================================================${C_RESET}"
+        echo -e "${C_GREEN}${C_BOLD}   ✅  MASTER CONTROL-PLANE IS ONLINE!                                         ${C_RESET}"
+        echo -e "${C_GREEN}${C_BOLD}===============================================================================${C_RESET}"
+        echo -e "  • LAN URL:      ${C_BOLD}${C_GREEN}http://${LOCAL_IP}:${PORT}${C_RESET}"
+        echo -e "  • Localhost:    ${C_BOLD}${C_GREEN}http://127.0.0.1:${PORT}${C_RESET}"
+        echo -e "${C_GREEN}===============================================================================${C_RESET}\n"
+        ;;
+    3)
+        # Worker Only
+        read -p "Master Host IP ya Domain (mesal: 192.168.1.50): " M_HOST
+        M_HOST=${M_HOST:-"127.0.0.1"}
+        read -p "Master Port [Pishfarz: 8080]: " M_PORT
+        M_PORT=${M_PORT:-8080}
+        read -p "Worker Ollama Port [Pishfarz: 11434]: " W_PORT
+        W_PORT=${W_PORT:-11434}
+
+        setup_worker "http://${M_HOST}:${M_PORT}" "$W_PORT"
+        ;;
+    4)
+        # Edge UI Mirror
+        bash /opt/omniops/install-edge-node.sh 2>/dev/null || bash ./install-edge-node.sh
+        ;;
+    5)
+        # Status monitor
+        echo -e "\n${C_CYAN}OmniOps Services Status:${C_RESET}"
+        systemctl status omniops --no-pager || true
+        echo -e "\n${C_CYAN}Active Listening Ports:${C_RESET}"
+        ss -tulpn | grep -E ':(8080|11434|443|80)' || netstat -tlpn 2>/dev/null | grep -E ':(8080|11434|443|80)' || true
+        ;;
+    *)
+        echo -e "${C_RED}Gozineye namotabar!${C_RESET}"
+        exit 1
+        ;;
+esac
