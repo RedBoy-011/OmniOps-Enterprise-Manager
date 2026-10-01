@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ParsedCommand } from '../services/commandParser';
 import { getStoredCredentials } from '../services/credentialService';
+import { invokeTauri } from '../services/tauriBridge';
 
 interface ApprovalProps {
   pendingCommand: ParsedCommand | null;
@@ -24,8 +25,7 @@ export const CommandApprovalModal: React.FC<ApprovalProps> = ({
     try {
       let res: any;
       try {
-        const { invoke } = await import('@tauri-apps/api/core');
-        res = await invoke('execute_windows_payload', {
+        res = await invokeTauri('execute_windows_payload', {
           action: pendingCommand.action,
           command: pendingCommand.command
         });

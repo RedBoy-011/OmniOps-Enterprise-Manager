@@ -1,3 +1,5 @@
+import { invokeTauri } from './tauriBridge';
+
 export interface Credentials {
   masterUrl: string;
   exchangeToken: string;
@@ -9,9 +11,8 @@ export interface Credentials {
  */
 export async function saveCredentials(masterUrl: string, exchangeToken: string): Promise<void> {
   try {
-    const { invoke } = await import('@tauri-apps/api/core');
-    await invoke('save_omni_credentials', { masterUrl, exchangeToken });
-  } catch (err) {
+    await invokeTauri('save_omni_credentials', { masterUrl, exchangeToken });
+  } catch {
     // Agar dar mohite web ya test bashe
     localStorage.setItem('omni_master_url', masterUrl);
     localStorage.setItem('omni_exchange_token', exchangeToken);
@@ -20,11 +21,10 @@ export async function saveCredentials(masterUrl: string, exchangeToken: string):
 
 export async function getStoredCredentials(): Promise<Credentials> {
   try {
-    const { invoke } = await import('@tauri-apps/api/core');
-    const creds = await invoke<any>('load_omni_credentials');
+    const creds = await invokeTauri<any>('load_omni_credentials');
     return {
-      masterUrl: creds.master_url || 'http://localhost:3000',
-      exchangeToken: creds.exchange_token || '',
+      masterUrl: creds?.master_url || 'http://localhost:3000',
+      exchangeToken: creds?.exchange_token || '',
     };
   } catch {
     return {

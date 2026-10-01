@@ -53,8 +53,14 @@ try {
         npm install --silent
         
         if (-not $SkipRustBuild) {
-            Write-Host "    [*] Running 'npm run tauri build' (MSVC Release)..." -ForegroundColor Gray
-            npm run tauri build
+            Write-Host "    [*] Compiling React companion frontend..." -ForegroundColor Gray
+            npm run build
+            Write-Host "    [*] Running 'npx @tauri-apps/cli build --no-bundle' (MSVC Release)..." -ForegroundColor Gray
+            try {
+                npx @tauri-apps/cli build --no-bundle
+            } catch {
+                cargo build --release --manifest-path src-tauri/Cargo.toml
+            }
         }
     }
 } catch {
