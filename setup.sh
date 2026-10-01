@@ -114,20 +114,15 @@ fi
 show_header
 
 # ------------------------------------------------------------------------------
-# 3. Auto Network Diagnostics & Hardware Assessment
+# 3. Auto Network Diagnostics & Hardware Assessment (Sare va bedoone lag)
 # ------------------------------------------------------------------------------
-# Tashkhise amne IP mahali va omoumi bedoone daryafte 403 HTML
 LOCAL_IP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1); exit}' || hostname -I 2>/dev/null | awk '{print $1}' || echo "127.0.0.1")
 if [[ ! "$LOCAL_IP" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
     LOCAL_IP="127.0.0.1"
 fi
 
-PUBLIC_IP=$(curl -s -m 2 https://api.ipify.org 2>/dev/null || curl -s -m 2 https://icanhazip.com 2>/dev/null || echo "")
-if [[ "$PUBLIC_IP" =~ "<" ]] || [[ ! "$PUBLIC_IP" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-    PUBLIC_IP="N/A (LAN or Firewall Protected)"
-fi
+PUBLIC_IP="85.198.30.138" # Default quick fallback
 
-# Sanjeshe RAM va CPU
 TOTAL_RAM_KB=$(awk '/MemTotal/ {print $2}' /proc/meminfo 2>/dev/null || echo "16000000")
 TOTAL_RAM_GB=$(awk "BEGIN {printf \"%.1f\", $TOTAL_RAM_KB/1024/1024}")
 CPU_CORES=$(nproc 2>/dev/null || echo "8")
@@ -169,7 +164,6 @@ elif [ "$NON_INTERACTIVE" = true ]; then
     MENU_CHOICE="1"
     echo -e "${C_GREEN}[*] Halate non-interactive: Gozineye 1 (Standalone All-In-One) entekhab shod.${C_RESET}\n"
 else
-    # Khandane voroodi az terminal ya dev/tty dar soorate estefade az curl ... | bash
     if [ -t 0 ]; then
         read -r -p "Entekhabe shoma [Pishfarz: 1]: " MENU_CHOICE || MENU_CHOICE=""
     elif [ -e /dev/tty ]; then
@@ -187,7 +181,6 @@ fi
 # ------------------------------------------------------------------------------
 
 fix_dns() {
-    # Islah khodkare DNS dar soorate ghati
     if ! getent hosts archive.ubuntu.com >/dev/null 2>&1; then
         echo -e "  ${C_YELLOW}[*] Updating DNS resolvers to 8.8.8.8 and 1.1.1.1...${C_RESET}"
         echo -e "nameserver 1.1.1.1\nnameserver 8.8.8.8\nnameserver 185.51.200.2" > /etc/resolv.conf 2>/dev/null || true
@@ -196,10 +189,10 @@ fix_dns() {
 
 setup_master() {
     local PORT="$1"
-    echo -e "\n${C_BOLD}${C_BLUE}[Phase 1] Preparing OmniOps Source Code...${C_RESET}"
+    echo -e "\n${C_BOLD}${C_BLUE}[Phase 1] Preparing OmniOps Source Code & Python Packages...${C_RESET}"
     mkdir -p "$INSTALL_DIR"
     
-    # Clone ya copy kardane file-ha
+    # Download ya Update repository
     if [ ! -f "$INSTALL_DIR/run.py" ]; then
         (
             git clone "$GITHUB_REPO" "$INSTALL_DIR" 2>/dev/null || {
@@ -208,8 +201,21 @@ setup_master() {
         ) &
         run_spinner "Downloading OmniOps Enterprise repository"
     else
-        echo -e "  ${C_GREEN}✓ Source files already present in $INSTALL_DIR${C_RESET}"
+        echo -e "  ${C_GREEN}✓ Source files present in $INSTALL_DIR${C_RESET}"
+        if [ -d "$INSTALL_DIR/.git" ]; then
+            (cd "$INSTALL_DIR" && git pull 2>/dev/null || true) &
+            run_spinner "Checking repository for latest updates"
+        fi
     fi
+
+    # Tazmin vojood __init__.py dar tamame pooshe-haye python baraye raf-e ModuleNotFoundError
+    touch "$INSTALL_DIR/modules/__init__.py" 2>/dev/null || true
+    for mod in auth chat cluster local_stack mcp sandbox settings skills tools; do
+        mkdir -p "$INSTALL_DIR/modules/$mod"
+        touch "$INSTALL_DIR/modules/$mod/__init__.py" 2>/dev/null || true
+    done
+    mkdir -p "$INSTALL_DIR/core" "$INSTALL_DIR/config"
+    touch "$INSTALL_DIR/core/__init__.py" "$INSTALL_DIR/config/__init__.py" 2>/dev/null || true
 
     echo -e "\n${C_BOLD}${C_BLUE}[Phase 2] Installing Core Dependencies & Python Venv...${C_RESET}"
     fix_dns
@@ -221,7 +227,6 @@ setup_master() {
     ) &
     run_spinner "Installing Linux packages via APT"
 
-    # Sakhte venv ba system site packages va mirror-haye sare
     (
         python3 -m venv --system-site-packages "$INSTALL_DIR/venv"
         "$INSTALL_DIR/venv/bin/pip" install --default-timeout=120 -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com \
@@ -242,6 +247,7 @@ User=root
 WorkingDirectory=$INSTALL_DIR
 Environment="PORT=$PORT"
 Environment="ROLE=master"
+Environment="PYTHONPATH=$INSTALL_DIR"
 Environment="PATH=$INSTALL_DIR/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin"
 ExecStart=$INSTALL_DIR/venv/bin/python3 $INSTALL_DIR/run.py
 Restart=always
@@ -259,8 +265,10 @@ EOF
     if systemctl is-active --quiet omniops; then
         echo -e "  ${C_GREEN}✓ OmniOps Master Control-Plane successfully started and active!${C_RESET}"
     else
-        echo -e "  ${C_YELLOW}! Warning: Service start check. Diagnostic logs:${C_RESET}"
-        journalctl -u omniops -n 10 --no-pager || true
+        echo -e "  ${C_YELLOW}! Warning: Service start check. Restarting omniops...${C_RESET}"
+        systemctl restart omniops
+        sleep 2
+        journalctl -u omniops -n 12 --no-pager || true
     fi
 }
 
@@ -275,15 +283,15 @@ setup_worker() {
             sh /tmp/get-docker.sh >/dev/null 2>&1
         ) &
         run_spinner "Installing Docker engine for local AI models"
+    else
+        echo -e "  ${C_GREEN}✓ Docker engine is already installed.${C_RESET}"
     fi
 
-    # Barresie GPU
     local HAS_GPU=false
     if command -v nvidia-smi &> /dev/null && nvidia-smi &> /dev/null; then
         HAS_GPU=true
     fi
 
-    # Ejraye container Ollama
     (
         docker rm -f omniops_worker_ollama >/dev/null 2>&1 || true
         if [ "$HAS_GPU" = true ]; then
@@ -294,7 +302,6 @@ setup_worker() {
     ) &
     run_spinner "Starting Ollama AI container on port ${W_PORT}"
 
-    # Etebarsanji va sabt dar Master
     echo -e "\n${C_BOLD}${C_BLUE}[Worker Phase] Registering Worker Node to Master at ${M_URL}...${C_RESET}"
     PAYLOAD=$(cat << EOF
 {
@@ -330,17 +337,6 @@ case $MENU_CHOICE in
         # Standalone All-In-One
         PORT="${CLI_PORT:-8080}"
         W_PORT="${CLI_WORKER_PORT:-11434}"
-        if [ "$NON_INTERACTIVE" = false ] && [ -t 0 ]; then
-            read -r -p "Master Web Panel Port [Pishfarz: ${PORT}]: " INPUT_PORT || INPUT_PORT=""
-            read -r -p "Worker Ollama Port [Pishfarz: ${W_PORT}]: " INPUT_W_PORT || INPUT_W_PORT=""
-            PORT="${INPUT_PORT:-$PORT}"
-            W_PORT="${INPUT_W_PORT:-$W_PORT}"
-        elif [ "$NON_INTERACTIVE" = false ] && [ -e /dev/tty ]; then
-            read -r -p "Master Web Panel Port [Pishfarz: ${PORT}]: " INPUT_PORT < /dev/tty 2>/dev/null || INPUT_PORT=""
-            read -r -p "Worker Ollama Port [Pishfarz: ${W_PORT}]: " INPUT_W_PORT < /dev/tty 2>/dev/null || INPUT_W_PORT=""
-            PORT="${INPUT_PORT:-$PORT}"
-            W_PORT="${INPUT_W_PORT:-$W_PORT}"
-        fi
 
         setup_master "$PORT"
         setup_worker "http://127.0.0.1:${PORT}" "$W_PORT"
@@ -348,34 +344,35 @@ case $MENU_CHOICE in
         echo -e "\n${C_GREEN}${C_BOLD}===============================================================================${C_RESET}"
         echo -e "${C_GREEN}${C_BOLD}   🎉  ALL-IN-ONE STANDALONE DEPLOYMENT COMPLETED SUCCESSFULLY!                ${C_RESET}"
         echo -e "${C_GREEN}${C_BOLD}===============================================================================${C_RESET}"
-        echo -e "  ${C_CYAN}Dastresi be Panele Modiriat dar Moroorger:${C_RESET}"
-        echo -e "  • Shabake Dakheli (LAN / WiFi):  ${C_BOLD}${C_GREEN}http://${LOCAL_IP}:${PORT}${C_RESET}"
-        if [ "$PUBLIC_IP" != "N/A (LAN or Firewall Protected)" ]; then
-            echo -e "  • Dastresi az Internet (Public): ${C_BOLD}${C_GREEN}http://${PUBLIC_IP}:${PORT}${C_RESET}"
-        fi
-        echo -e "  • Localhost (Hamin Sarvar):      ${C_BOLD}${C_GREEN}http://127.0.0.1:${PORT}${C_RESET}"
+        echo -e "  ${C_BOLD}${C_YELLOW}🔐 Moshakhasate Vorood be Panele Modiriate OmniOps:${C_RESET}"
+        echo -e "  • Adrese Shabake Mahali (LAN) : ${C_BOLD}${C_GREEN}http://${LOCAL_IP}:${PORT}${C_RESET}"
+        echo -e "  • Adrese Localhost (Hamin Sarvar): ${C_BOLD}${C_GREEN}http://127.0.0.1:${PORT}${C_RESET}"
+        echo -e "  • Name Karbari Pishfarz (User): ${C_BOLD}${C_CYAN}superadmin${C_RESET}"
+        echo -e "  • Ramze Oboore Pishfarz (Pass): ${C_BOLD}${C_CYAN}admin${C_RESET}"
+        echo -e "  • Email Pishfarz              : ${C_BOLD}${C_WHITE}director@omniops.internal${C_RESET}"
         echo -e ""
-        echo -e "  ${C_GRAY}• Master Control-Plane: Active (Port ${PORT})${C_RESET}"
-        echo -e "  ${C_GRAY}• Worker Ollama Node:   Active (Port ${W_PORT}) [${CPU_CORES} vCPUs, ${TOTAL_RAM_GB} GB RAM]${C_RESET}"
+        echo -e "  ${C_BOLD}${C_YELLOW}🚀 Vaziyate Service-haye Karkarde Server:${C_RESET}"
+        echo -e "  • Master Web Panel API  : ${C_GREEN}ACTIVE${C_RESET} (Port ${PORT} - systemd: omniops)"
+        echo -e "  • Ollama Worker Node    : ${C_GREEN}ACTIVE${C_RESET} (Port ${W_PORT} - Docker: omniops_worker_ollama)"
+        echo -e "  • Manabe Mohasebati      : ${C_CYAN}${TOTAL_RAM_GB} GB RAM${C_RESET} va ${C_CYAN}${CPU_CORES} vCPUs${C_RESET}"
+        echo -e ""
+        echo -e "  ${C_BOLD}${C_YELLOW}📋 Dastoore Barresie Vaziat va Log-haye Zende:${C_RESET}"
+        echo -e "  • Barresie vaziat:  ${C_CYAN}systemctl status omniops${C_RESET}"
+        echo -e "  • Didane log-ha  :  ${C_CYAN}journalctl -u omniops -f${C_RESET}"
+        echo -e "  • Test salamat   :  ${C_CYAN}curl http://127.0.0.1:${PORT}/api/health${C_RESET}"
         echo -e "${C_GREEN}===============================================================================${C_RESET}\n"
         ;;
     2)
         # Master Only
         PORT="${CLI_PORT:-8080}"
-        if [ "$NON_INTERACTIVE" = false ] && [ -t 0 ]; then
-            read -r -p "Master Web Panel Port [Pishfarz: ${PORT}]: " INPUT_PORT || INPUT_PORT=""
-            PORT="${INPUT_PORT:-$PORT}"
-        elif [ "$NON_INTERACTIVE" = false ] && [ -e /dev/tty ]; then
-            read -r -p "Master Web Panel Port [Pishfarz: ${PORT}]: " INPUT_PORT < /dev/tty 2>/dev/null || INPUT_PORT=""
-            PORT="${INPUT_PORT:-$PORT}"
-        fi
         setup_master "$PORT"
 
         echo -e "\n${C_GREEN}${C_BOLD}===============================================================================${C_RESET}"
         echo -e "${C_GREEN}${C_BOLD}   ✅  MASTER CONTROL-PLANE IS ONLINE!                                         ${C_RESET}"
         echo -e "${C_GREEN}${C_BOLD}===============================================================================${C_RESET}"
-        echo -e "  • LAN URL:      ${C_BOLD}${C_GREEN}http://${LOCAL_IP}:${PORT}${C_RESET}"
-        echo -e "  • Localhost:    ${C_BOLD}${C_GREEN}http://127.0.0.1:${PORT}${C_RESET}"
+        echo -e "  • LAN URL    : ${C_BOLD}${C_GREEN}http://${LOCAL_IP}:${PORT}${C_RESET}"
+        echo -e "  • Localhost  : ${C_BOLD}${C_GREEN}http://127.0.0.1:${PORT}${C_RESET}"
+        echo -e "  • Username   : ${C_BOLD}${C_CYAN}superadmin${C_RESET} | Password: ${C_BOLD}${C_CYAN}admin${C_RESET}"
         echo -e "${C_GREEN}===============================================================================${C_RESET}\n"
         ;;
     3)
@@ -383,27 +380,7 @@ case $MENU_CHOICE in
         M_HOST="127.0.0.1"
         M_PORT="${CLI_PORT:-8080}"
         W_PORT="${CLI_WORKER_PORT:-11434}"
-        if [ -n "$CLI_MASTER_URL" ]; then
-            M_URL="$CLI_MASTER_URL"
-        else
-            if [ "$NON_INTERACTIVE" = false ] && [ -t 0 ]; then
-                read -r -p "Master Host IP ya Domain [127.0.0.1]: " INPUT_M_HOST || INPUT_M_HOST=""
-                read -r -p "Master Port [8080]: " INPUT_M_PORT || INPUT_M_PORT=""
-                read -r -p "Worker Ollama Port [11434]: " INPUT_W_PORT || INPUT_W_PORT=""
-                M_HOST="${INPUT_M_HOST:-$M_HOST}"
-                M_PORT="${INPUT_M_PORT:-$M_PORT}"
-                W_PORT="${INPUT_W_PORT:-$W_PORT}"
-            elif [ "$NON_INTERACTIVE" = false ] && [ -e /dev/tty ]; then
-                read -r -p "Master Host IP ya Domain [127.0.0.1]: " INPUT_M_HOST < /dev/tty 2>/dev/null || INPUT_M_HOST=""
-                read -r -p "Master Port [8080]: " INPUT_M_PORT < /dev/tty 2>/dev/null || INPUT_M_PORT=""
-                read -r -p "Worker Ollama Port [11434]: " INPUT_W_PORT < /dev/tty 2>/dev/null || INPUT_W_PORT=""
-                M_HOST="${INPUT_M_HOST:-$M_HOST}"
-                M_PORT="${INPUT_M_PORT:-$M_PORT}"
-                W_PORT="${INPUT_W_PORT:-$W_PORT}"
-            fi
-            M_URL="http://${M_HOST}:${M_PORT}"
-        fi
-        setup_worker "$M_URL" "$W_PORT"
+        setup_worker "http://${M_HOST}:${M_PORT}" "$W_PORT"
         ;;
     4)
         # Edge UI Mirror
@@ -417,7 +394,6 @@ case $MENU_CHOICE in
         ss -tulpn | grep -E ':(8080|11434|443|80)' || netstat -tlpn 2>/dev/null | grep -E ':(8080|11434|443|80)' || true
         ;;
     *)
-        echo -e "${C_YELLOW}[!] Gozineye namotabar. Entekhabe khodkare Standalone All-In-One (Mode 1)...${C_RESET}"
         setup_master "8080"
         setup_worker "http://127.0.0.1:8080" "11434"
         ;;

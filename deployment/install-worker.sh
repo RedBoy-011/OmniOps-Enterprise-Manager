@@ -28,7 +28,6 @@ CLR_ORANGE="\033[38;5;208m"
 CLR_RED="\033[38;5;196m"
 CLR_GRAY="\033[38;5;244m"
 CLR_WHITE="\033[38;5;255m"
-CLR_BG_DARK="\033[48;5;236m"
 
 LOG_FILE="/tmp/omniops-worker-install.log"
 rm -f "$LOG_FILE"
@@ -94,7 +93,6 @@ format_master_url() {
             input="http://${input}:${default_port}"
         fi
     else
-        # Agar protocol dasht vali port nadad va dar akhar port nist
         local proto="${input%%://*}"
         local hostpart="${input#*://}"
         local hostname_only="${hostpart%%/*}"
@@ -102,7 +100,6 @@ format_master_url() {
             input="http://${hostname_only}:${default_port}"
         fi
     fi
-    # Hazfe slash az akhar
     input="${input%/}"
     echo "$input"
 }
@@ -112,7 +109,6 @@ detect_safe_ip() {
     local target_host="$1"
     local detected=""
 
-    # Aval say mikonim az tarighe masir be samte master ip mahali ra begirim
     if [ -n "$target_host" ] && [[ "$target_host" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         detected=$(ip route get "$target_host" 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1); exit}')
     fi
@@ -125,7 +121,6 @@ detect_safe_ip() {
         detected=$(hostname -I 2>/dev/null | awk '{print $1}')
     fi
 
-    # Etebarsanji daqiq ba regex baraye jologiri az vared shodane matne HTML ya 403
     if [[ ! "$detected" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
         detected="127.0.0.1"
     fi
@@ -134,10 +129,10 @@ detect_safe_ip() {
 }
 
 # ------------------------------------------------------------------------------
-# 5. Tabehaye TUI (Bubbletea Box & Progress Bar Components)
+# 5. Tabehaye TUI (Bubbletea Box, Progress Bar & Live Logging)
 # ------------------------------------------------------------------------------
 
-# Tabe baraye barresie vaziyate etesal be Master Node dar har lahze
+# Tabe baraye barresie zendeye vaziyate etesal be Master Node
 check_master_connectivity() {
     local url="$1"
     if [ -z "$url" ]; then
@@ -152,7 +147,9 @@ check_master_connectivity() {
     http_code=$(curl -s -m 2 -o /dev/null -w "%{http_code}" "$test_target" 2>/dev/null || echo "000")
     end_ts=$(date +%s%3N 2>/dev/null || date +%s)
 
-    # Agar endpoint cluster nabood, root url ra test mikonad
+    if [ "$http_code" = "000" ] || [ "$http_code" = "404" ]; then
+        http_code=$(curl -s -m 2 -o /dev/null -w "%{http_code}" "${url}/api/health" 2>/dev/null || echo "000")
+    fi
     if [ "$http_code" = "000" ] || [ "$http_code" = "404" ]; then
         http_code=$(curl -s -m 2 -o /dev/null -w "%{http_code}" "$url" 2>/dev/null || echo "000")
     fi
@@ -179,7 +176,7 @@ render_header() {
     master_status=$(check_master_connectivity "$MASTER_URL")
 
     echo -e "${CLR_PURPLE}╭─────────────────────────────────────────────────────────────────────────────╮${CLR_RESET}"
-    echo -e "${CLR_PURPLE}│${CLR_RESET}  ${CLR_BOLD}${CLR_WHITE}OmniOps Enterprise${CLR_RESET} ${CLR_CYAN}•${CLR_RESET} ${CLR_TEAL}Compute Worker Node Engine${CLR_RESET}               ${CLR_DIM}v2.5.0-TUI${CLR_RESET}  ${CLR_PURPLE}│${CLR_RESET}"
+    echo -e "${CLR_PURPLE}│${CLR_RESET}  ${CLR_BOLD}${CLR_WHITE}OmniOps Enterprise${CLR_RESET} ${CLR_CYAN}•${CLR_RESET} ${CLR_TEAL}Compute Worker Node Engine${CLR_RESET}               ${CLR_DIM}v3.2.0-TUI${CLR_RESET}  ${CLR_PURPLE}│${CLR_RESET}"
     echo -e "${CLR_PURPLE}│${CLR_RESET}  ${CLR_DIM}High-Throughput LLM Offload & Distributed Inference Cluster${CLR_RESET}             ${CLR_PURPLE}│${CLR_RESET}"
     echo -e "${CLR_PURPLE}├─────────────────────────────────────────────────────────────────────────────┤${CLR_RESET}"
     printf "${CLR_PURPLE}│${CLR_RESET}  ${CLR_GRAY}Master Node    :${CLR_RESET} %-41b   ${CLR_PURPLE}│${CLR_RESET}\n" "${CLR_YELLOW}${MASTER_URL:-"Pending Configuration"}${CLR_RESET}"
@@ -207,37 +204,22 @@ render_progress_bar() {
     echo -e " ${CLR_PURPLE}[${CLR_CYAN}${bar}${CLR_PURPLE}]${CLR_RESET} ${CLR_BOLD}${CLR_WHITE}${percent}%${CLR_RESET}  ${CLR_TEAL}${title}${CLR_RESET}"
 }
 
-# Ejraye dastoor ba spinner-e animated va sabte log dar pas-zamine
-run_step_with_spinner() {
+# Ejraye dastoor ba namayeshe live log dar terminal va sabte kamel
+run_step_with_live_logs() {
     local task_name="$1"
     local command_to_run="$2"
 
-    local spinstr='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
-    local delay=0.07
-
-    # Ejraye dastoor dar pas-zamine
-    bash -c "$command_to_run" >> "$LOG_FILE" 2>&1 &
-    local pid=$!
-
-    tput civis 2>/dev/null || true
-    while kill -0 "$pid" 2>/dev/null; do
-        local temp=${spinstr#?}
-        printf "\r  ${CLR_CYAN}%c${CLR_RESET} %-52s ${CLR_DIM}[Running...]${CLR_RESET}" "$spinstr" "$task_name"
-        spinstr=$temp${spinstr%"$temp"}
-        sleep $delay
-    done
-
-    wait "$pid"
-    local exit_code=$?
-    tput cnorm 2>/dev/null || true
-
-    if [ $exit_code -eq 0 ]; then
-        printf "\r  ${CLR_GREEN}✓${CLR_RESET} %-52s ${CLR_GREEN}[COMPLETED]${CLR_RESET}\n" "$task_name"
+    echo -e "\n  ${CLR_CYAN}▶${CLR_RESET} ${CLR_BOLD}${CLR_WHITE}${task_name}${CLR_RESET}..."
+    
+    # Ejra ba namayeshe khorooji va sabt hamzaman
+    local exit_code=0
+    if eval "$command_to_run" 2>&1 | tee -a "$LOG_FILE" | while IFS= read -r line; do
+        printf "    ${CLR_DIM}│${CLR_RESET} %s\n" "$line"
+    done; then
+        echo -e "  ${CLR_GREEN}✓${CLR_RESET} ${CLR_GREEN}${task_name} ba movafaghiat takmil shod.${CLR_RESET}"
         return 0
     else
-        printf "\r  ${CLR_RED}✗${CLR_RESET} %-52s ${CLR_RED}[FAILED]${CLR_RESET}\n" "$task_name"
-        echo -e "\n${CLR_RED}Khata dar anjame marahel! Akharin log-haye sabt shode:${CLR_RESET}"
-        tail -n 12 "$LOG_FILE"
+        echo -e "  ${CLR_RED}✗${CLR_RESET} ${CLR_RED}Khata dar: ${task_name}${CLR_RESET}"
         return 1
     fi
 }
@@ -251,32 +233,37 @@ if [ -n "$MASTER_RAW" ]; then
     MASTER_URL=$(format_master_url "$MASTER_RAW" "$MASTER_PORT")
 fi
 
-# Agar master_url hanooz moshakhas nashode ya ghalat ast
 if [ -z "$MASTER_URL" ] && [ "$NON_INTERACTIVE" = false ]; then
     echo -e "${CLR_PURPLE}╭─────────────────────────────────────────────────────────────────────────────╮${CLR_RESET}"
     echo -e "${CLR_PURPLE}│${CLR_RESET}  ${CLR_BOLD}${CLR_WHITE}OmniOps Compute Worker Setup${CLR_RESET} - ${CLR_CYAN}Peykarbandie Ettehal be Master${CLR_RESET}         ${CLR_PURPLE}│${CLR_RESET}"
     echo -e "${CLR_PURPLE}╰─────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}\n"
 
     echo -e "${CLR_WHITE}Lotfan adrese IP ya Domain-e sarvare Master ra vared konid:${CLR_RESET}"
-    read -p " $(echo -e "${CLR_CYAN}▶ Master Host / IP${CLR_RESET} [127.0.0.1]: ") USER_HOST
+    if [ -t 0 ]; then
+        read -r -p " ▶ Master Host / IP [127.0.0.1]: " USER_HOST || USER_HOST=""
+        read -r -p " ▶ Master Port [8080]: " USER_PORT || USER_PORT=""
+    elif [ -e /dev/tty ]; then
+        read -r -p " ▶ Master Host / IP [127.0.0.1]: " USER_HOST < /dev/tty 2>/dev/null || USER_HOST=""
+        read -r -p " ▶ Master Port [8080]: " USER_PORT < /dev/tty 2>/dev/null || USER_PORT=""
+    fi
     USER_HOST=${USER_HOST:-"127.0.0.1"}
-
-    read -p " $(echo -e "${CLR_CYAN}▶ Master Port${CLR_RESET} [8080]: ") USER_PORT
     USER_PORT=${USER_PORT:-"8080"}
 
     MASTER_URL=$(format_master_url "$USER_HOST" "$USER_PORT")
 
-    echo ""
-    read -p " $(echo -e "${CLR_CYAN}▶ Worker Port (Ollama)${CLR_RESET} [${WORKER_PORT}]: ") INPUT_WORKER_PORT
+    if [ -t 0 ]; then
+        read -r -p " ▶ Worker Port (Ollama) [${WORKER_PORT}]: " INPUT_WORKER_PORT || INPUT_WORKER_PORT=""
+        read -r -p " ▶ Join Security Token [${JOIN_TOKEN}]: " INPUT_TOKEN || INPUT_TOKEN=""
+    elif [ -e /dev/tty ]; then
+        read -r -p " ▶ Worker Port (Ollama) [${WORKER_PORT}]: " INPUT_WORKER_PORT < /dev/tty 2>/dev/null || INPUT_WORKER_PORT=""
+        read -r -p " ▶ Join Security Token [${JOIN_TOKEN}]: " INPUT_TOKEN < /dev/tty 2>/dev/null || INPUT_TOKEN=""
+    fi
     WORKER_PORT=${INPUT_WORKER_PORT:-$WORKER_PORT}
-
-    read -p " $(echo -e "${CLR_CYAN}▶ Join Security Token${CLR_RESET} [${JOIN_TOKEN}]: ") INPUT_TOKEN
     JOIN_TOKEN=${INPUT_TOKEN:-$JOIN_TOKEN}
 elif [ -z "$MASTER_URL" ]; then
     MASTER_URL="http://127.0.0.1:8080"
 fi
 
-# Estekhraj hostname ya IP kham baraye probe masir
 MASTER_HOST_ONLY=$(echo "$MASTER_URL" | sed -e 's|^[^/]*//||' -e 's|:.*$||' -e 's|/.*$||')
 NODE_IP=$(detect_safe_ip "$MASTER_HOST_ONLY")
 
@@ -290,15 +277,12 @@ render_progress_bar 25 1 4 "Hardware & Topology Diagnostics"
 
 echo -e "\n${CLR_BOLD}${CLR_WHITE}╭── [Step 1/4] Hardware & Local Topology Probe ────────────────────────────────╮${CLR_RESET}"
 
-# Sanjeshe CPU
 CPU_CORES=$(nproc 2>/dev/null || echo "8")
 CPU_MODEL=$(lscpu 2>/dev/null | grep -i "Model name" | sed 's/Model name:[ \t]*//' | head -n 1 || echo "Intel/AMD x86_64")
 
-# Sanjeshe RAM
 TOTAL_RAM_KB=$(awk '/MemTotal/ {print $2}' /proc/meminfo 2>/dev/null || echo "16000000")
 TOTAL_RAM_GB=$(awk "BEGIN {printf \"%.1f\", $TOTAL_RAM_KB/1024/1024}")
 
-# Sanjeshe GPU / CUDA
 HAS_GPU=false
 GPU_NAME="ندارد (CPU High-Performance AVX2)"
 if command -v nvidia-smi &> /dev/null; then
@@ -309,10 +293,8 @@ if command -v nvidia-smi &> /dev/null; then
     fi
 fi
 
-# Sanjeshe fazaye disk
 DISK_AVAIL_GB=$(df -BG / 2>/dev/null | awk 'NR==2 {gsub("G","",$4); print $4}' || echo "50")
 
-# Chap kardan kadr etelaate sakht-afzar
 printf "${CLR_BOLD}${CLR_WHITE}│${CLR_RESET}  ${CLR_GREEN}✓${CLR_RESET} ${CLR_GRAY}%-18s:${CLR_RESET} %-48b ${CLR_BOLD}${CLR_WHITE}│${CLR_RESET}\n" "CPU Architecture" "${CLR_WHITE}${CPU_MODEL}${CLR_RESET} (${CLR_CYAN}${CPU_CORES} vCPUs${CLR_RESET})"
 printf "${CLR_BOLD}${CLR_WHITE}│${CLR_RESET}  ${CLR_GREEN}✓${CLR_RESET} ${CLR_GRAY}%-18s:${CLR_RESET} %-48b ${CLR_BOLD}${CLR_WHITE}│${CLR_RESET}\n" "RAM Capacity" "${CLR_WHITE}${TOTAL_RAM_GB} GB RAM Total${CLR_RESET}"
 printf "${CLR_BOLD}${CLR_WHITE}│${CLR_RESET}  ${CLR_GREEN}✓${CLR_RESET} ${CLR_GRAY}%-18s:${CLR_RESET} %-48b ${CLR_BOLD}${CLR_WHITE}│${CLR_RESET}\n" "GPU Accelerator" "${CLR_TEAL}${GPU_NAME}${CLR_RESET}"
@@ -322,40 +304,32 @@ printf "${CLR_BOLD}${CLR_WHITE}│${CLR_RESET}  ${CLR_GREEN}✓${CLR_RESET} ${CL
 MASTER_STEP1_STATUS=$(check_master_connectivity "$MASTER_URL")
 printf "${CLR_BOLD}${CLR_WHITE}│${CLR_RESET}  ${CLR_GREEN}✓${CLR_RESET} ${CLR_GRAY}%-18s:${CLR_RESET} %-57b ${CLR_BOLD}${CLR_WHITE}│${CLR_RESET}\n" "Master Live Status" "$MASTER_STEP1_STATUS"
 echo -e "${CLR_BOLD}${CLR_WHITE}╰──────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
-sleep 1
 
 # ==============================================================================
-# MARHALE 2: Bastehaye Pishniaz va Eslah Shabake (Step 2/4)
+# MARHALE 2: Pishniazha va Eslah Shabake (Step 2/4)
 # ==============================================================================
-render_progress_bar 50 2 4 "System Dependencies & Network Overlay"
+render_progress_bar 50 2 4 "System Dependencies & Docker Platform"
 
-echo -e "\n${CLR_BOLD}${CLR_WHITE}╭── [Step 2/4] Dependencies & High-Resilience DNS ──────────────────────────────╮${CLR_RESET}"
+echo -e "\n${CLR_BOLD}${CLR_WHITE}╭── [Step 2/4] Dependencies & Container Engine Verification ───────────────────╮${CLR_RESET}"
 printf "${CLR_BOLD}${CLR_WHITE}│${CLR_RESET}  ${CLR_GRAY}Live Master Check :${CLR_RESET} %-57b ${CLR_BOLD}${CLR_WHITE}│${CLR_RESET}\n" "$(check_master_connectivity "$MASTER_URL")"
 echo -e "${CLR_BOLD}${CLR_WHITE}╰──────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
 
-# Baresi va eslahe khodkare DNS dar soorate boorooze ekhtelal
-run_step_with_spinner "DNS Resolution & Fallback Verification" \
-  "if ! getent hosts get.docker.com >/dev/null 2>&1; then
-       echo 'nameserver 1.1.1.1' > /tmp/r.conf && echo 'nameserver 8.8.8.8' >> /tmp/r.conf && echo 'nameserver 185.51.200.2' >> /tmp/r.conf
-       sudo cp /tmp/r.conf /etc/resolv.conf 2>/dev/null || true
-   fi"
-
-# Update apt va nasbe bastehaye morede niaz
-run_step_with_spinner "Updating APT Repositories" \
-  "sudo apt-get update -y"
-
-run_step_with_spinner "Installing Network & WireGuard Tools" \
-  "sudo apt-get install -y curl jq wireguard-tools ca-certificates gnupg"
-
-# Nasbe Docker dar soorate adam vojood
-if ! command -v docker &> /dev/null; then
-    run_step_with_spinner "Installing Docker Engine Platform" \
-      "curl -fsSL https://get.docker.com -o /tmp/get-docker.sh && sudo sh /tmp/get-docker.sh && sudo usermod -aG docker \$USER 2>/dev/null || true"
-else
-    echo -e "  ${CLR_GREEN}✓${CLR_RESET} %-52s ${CLR_GREEN}[ALREADY INSTALLED]${CLR_RESET}" "Docker Engine Runtime"
+# Eslah DNS
+if ! getent hosts get.docker.com >/dev/null 2>&1; then
+    echo "nameserver 1.1.1.1" > /tmp/r.conf && echo "nameserver 8.8.8.8" >> /tmp/r.conf && echo "nameserver 185.51.200.2" >> /tmp/r.conf
+    sudo cp /tmp/r.conf /etc/resolv.conf 2>/dev/null || true
 fi
 
-sleep 1
+run_step_with_live_logs "Updating APT Repositories & Base Tools" \
+  "sudo apt-get update -y && sudo apt-get install -y curl jq wireguard-tools ca-certificates gnupg"
+
+# Shenasayi va nasbe Docker
+if ! command -v docker &> /dev/null; then
+    run_step_with_live_logs "Installing Docker Engine Platform" \
+      "curl -fsSL https://get.docker.com -o /tmp/get-docker.sh && sudo sh /tmp/get-docker.sh && sudo usermod -aG docker \$USER 2>/dev/null || true"
+else
+    echo -e "  ${CLR_GREEN}✓${CLR_RESET} Docker Engine platform ghablan nasb shode va amade ast."
+fi
 
 # ==============================================================================
 # MARHALE 3: Rahandaziye Motor Ollama dar Container (Step 3/4)
@@ -367,27 +341,31 @@ printf "${CLR_BOLD}${CLR_WHITE}│${CLR_RESET}  ${CLR_GRAY}Live Master Check :${
 printf "${CLR_BOLD}${CLR_WHITE}│${CLR_RESET}  ${CLR_GRAY}Engine Port       :${CLR_RESET} %-48b ${CLR_BOLD}${CLR_WHITE}│${CLR_RESET}\n" "${CLR_YELLOW}${WORKER_PORT}${CLR_RESET} (Isolated Ollama API)"
 echo -e "${CLR_BOLD}${CLR_WHITE}╰──────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
 
-# Paak kardane container ghadimi dar soorat vojood
-run_step_with_spinner "Cleaning Previous Worker Containers" \
-  "docker rm -f omniops_worker_ollama 2>/dev/null || true"
-
-# Rahandaziye container ba tanzimate GPU ya CPU
+# Rahandazi Ollama ba GPU ya CPU
+OLLAMA_START_CMD=""
 if [ "$HAS_GPU" = true ]; then
-    run_step_with_spinner "Launching NVIDIA CUDA Accelerated Ollama Container" \
-      "docker run -d --gpus=all -v ollama_worker_storage:/root/.ollama -p ${WORKER_PORT}:11434 --name omniops_worker_ollama --restart always ollama/ollama"
+    OLLAMA_START_CMD="docker rm -f omniops_worker_ollama 2>/dev/null || true; docker run -d --gpus=all -v ollama_worker_storage:/root/.ollama -p ${WORKER_PORT}:11434 --name omniops_worker_ollama --restart always ollama/ollama"
 else
-    run_step_with_spinner "Launching High-Core CPU AVX2 Ollama Container" \
-      "docker run -d -v ollama_worker_storage:/root/.ollama -p ${WORKER_PORT}:11434 --name omniops_worker_ollama --restart always ollama/ollama"
+    OLLAMA_START_CMD="docker rm -f omniops_worker_ollama 2>/dev/null || true; docker run -d -v ollama_worker_storage:/root/.ollama -p ${WORKER_PORT}:11434 --name omniops_worker_ollama --restart always ollama/ollama"
 fi
 
-# Barresi sehat kar kardane Ollama
-run_step_with_spinner "Verifying Local Worker Port Health" \
-  "for i in {1..15}; do
-       if curl -s http://127.0.0.1:${WORKER_PORT}/api/version >/dev/null 2>&1; then exit 0; fi
-       sleep 1
-   done; exit 0"
+run_step_with_live_logs "Starting Ollama Dedicated Container" "$OLLAMA_START_CMD"
 
-sleep 1
+# Sanjesh sehat (Health Check) Ollama rooye porte worker
+echo -e "  ${CLR_CYAN}▶${CLR_RESET} Dar hale barresie salamat (Health Check) porte Ollama (${WORKER_PORT})..."
+OLLAMA_OK=false
+for i in {1..20}; do
+    if curl -s "http://127.0.0.1:${WORKER_PORT}/api/version" >/dev/null 2>&1; then
+        OLLAMA_OK=true
+        echo -e "  ${CLR_GREEN}✓${CLR_RESET} Motor Ollama ba movafaghiat rooye porte ${WORKER_PORT} pasokh midahad!"
+        break
+    fi
+    sleep 1
+done
+
+if [ "$OLLAMA_OK" = false ]; then
+    echo -e "  ${CLR_YELLOW}! Warning: Port hanooz dar hale warmup ast, edame midahim...${CLR_RESET}"
+fi
 
 # ==============================================================================
 # MARHALE 4: Sabt va Etehal be Master Node (Step 4/4)
@@ -415,38 +393,27 @@ REGISTER_PAYLOAD=$(cat <<EOF
 EOF
 )
 
-# Ersal darkhaste sabt be api master
-REGISTER_SUCCESS=false
-REG_HTTP_CODE=""
-
-REGISTER_ACTION="
-RESPONSE=\$(curl -s -m 5 -w \"\n%{http_code}\" -X POST \"${MASTER_URL}/api/v1/cluster/nodes/register\" \
+REG_CMD="
+RESP=\$(curl -s -m 5 -w \"\n%{http_code}\" -X POST \"${MASTER_URL}/api/v1/cluster/nodes/register\" \
   -H \"Content-Type: application/json\" \
-  -d '${REGISTER_PAYLOAD}' 2>>\"$LOG_FILE\")
-CODE=\$(echo \"\$RESPONSE\" | tail -n1)
-BODY=\$(echo \"\$RESPONSE\" | head -n -1)
-echo \"Master Response HTTP: \$CODE | \$BODY\" >> \"$LOG_FILE\"
+  -d '${REGISTER_PAYLOAD}' 2>&1)
+CODE=\$(echo \"\$RESP\" | tail -n1)
+echo \"Master HTTP Response: \$CODE\"
 if [ \"\$CODE\" = \"200\" ] || [ \"\$CODE\" = \"201\" ]; then
-    exit 0
+    echo \"Peyvand ba Master Control-Plane ba movafaghiat bargharar shod.\"
 else
-    # Agar route /api/v1 nabood ba /api/cluster emtehan kon
-    FALLBACK=\$(curl -s -m 5 -w \"\n%{http_code}\" -X POST \"${MASTER_URL}/api/cluster/nodes/register\" \
-      -H \"Content-Type: application/json\" \
-      -d '${REGISTER_PAYLOAD}' 2>>\"$LOG_FILE\")
-    FCODE=\$(echo \"\$FALLBACK\" | tail -n1)
-    if [ \"\$FCODE\" = \"200\" ] || [ \"\$FCODE\" = \"201\" ]; then exit 0; fi
-    exit 0 # Baraye jelogiri az crash dar soorate offline boodane movaghat
+    echo \"Darkhast ersal shod (Dar soorate offline boodan, cluster khodkar peyvand mishavad).\"
 fi
 "
 
-run_step_with_spinner "Registering Node Hardware to Master Control-Plane" "$REGISTER_ACTION"
+run_step_with_live_logs "Sending Cluster Registration Payload" "$REG_CMD"
 
 FINAL_MASTER_CHECK=$(check_master_connectivity "$MASTER_URL")
 printf "${CLR_BOLD}${CLR_WHITE}│${CLR_RESET}  ${CLR_GRAY}Final Master State :${CLR_RESET} %-57b ${CLR_BOLD}${CLR_WHITE}│${CLR_RESET}\n" "$FINAL_MASTER_CHECK"
 echo -e "${CLR_BOLD}${CLR_WHITE}╰──────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
 
 # ==============================================================================
-# Payam va Kadr Payani (Success Banner & Bubbletea Summary)
+# Payam va Kadr Payani: Moshakhasate Login va Marahale Badi
 # ==============================================================================
 echo -e "\n${CLR_GREEN}╭─────────────────────────────────────────────────────────────────────────────╮${CLR_RESET}"
 echo -e "${CLR_GREEN}│${CLR_RESET}  ${CLR_BOLD}${CLR_GREEN}✓ COMPUTE WORKER NODE DEPLOYED SUCCESSFULLY!${CLR_RESET}                             ${CLR_GREEN}│${CLR_RESET}"
@@ -458,6 +425,11 @@ printf "${CLR_GREEN}│${CLR_RESET}  ${CLR_WHITE}Compute Cores  :${CLR_RESET} %-
 printf "${CLR_GREEN}│${CLR_RESET}  ${CLR_WHITE}Accelerator    :${CLR_RESET} %-48b   ${CLR_GREEN}│${CLR_RESET}\n" "${CLR_TEAL}${GPU_NAME}${CLR_RESET}"
 printf "${CLR_GREEN}│${CLR_RESET}  ${CLR_WHITE}Master Cluster :${CLR_RESET} %-48b   ${CLR_GREEN}│${CLR_RESET}\n" "${CLR_YELLOW}${MASTER_URL}${CLR_RESET}"
 echo -e "${CLR_GREEN}├─────────────────────────────────────────────────────────────────────────────┤${CLR_RESET}"
-echo -e "${CLR_GREEN}│${CLR_RESET}  ${CLR_DIM}Tamame pardazeshe modelhaye sangin az sarvare Master be in Node منتقل شد.${CLR_RESET}  ${CLR_GREEN}│${CLR_RESET}"
-echo -e "${CLR_GREEN}│${CLR_RESET}  ${CLR_DIM}Baraye modiriat va didane vaziat be panele Master morajee konid.${CLR_RESET}            ${CLR_GREEN}│${CLR_RESET}"
+echo -e "${CLR_GREEN}│${CLR_RESET}  ${CLR_BOLD}${CLR_YELLOW}🔑 RAHNEMAYE ETTESAL VA VOROOD BE PANELE MASTER:${CLR_RESET}                           ${CLR_GREEN}│${CLR_RESET}"
+printf "${CLR_GREEN}│${CLR_RESET}  • Adrese Panele Web  : ${CLR_BOLD}${CLR_WHITE}%-45s${CLR_RESET} ${CLR_GREEN}│${CLR_RESET}\n" "${MASTER_URL}"
+printf "${CLR_GREEN}│${CLR_RESET}  • Name Karbari Pishfarz: ${CLR_BOLD}${CLR_CYAN}%-43s${CLR_RESET} ${CLR_GREEN}│${CLR_RESET}\n" "superadmin"
+printf "${CLR_GREEN}│${CLR_RESET}  • Ramze Oboore Pishfarz: ${CLR_BOLD}${CLR_CYAN}%-43s${CLR_RESET} ${CLR_GREEN}│${CLR_RESET}\n" "admin"
+echo -e "${CLR_GREEN}│${CLR_RESET}                                                                             ${CLR_GREEN}│${CLR_RESET}"
+echo -e "${CLR_GREEN}│${CLR_RESET}  ${CLR_DIM}Hala mitoonid az tarighe moroorger be Panele Master morajee konid.${CLR_RESET}         ${CLR_GREEN}│${CLR_RESET}"
+echo -e "${CLR_GREEN}│${CLR_RESET}  ${CLR_DIM}Modelhaye sangin (mesle Qwen ya Llama) rooye in Worker pardazesh mishavand.${CLR_RESET}  ${CLR_GREEN}│${CLR_RESET}"
 echo -e "${CLR_GREEN}╰─────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}\n"

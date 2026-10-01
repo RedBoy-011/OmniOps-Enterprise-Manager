@@ -1,0 +1,1 @@
+# Local stack module initialization

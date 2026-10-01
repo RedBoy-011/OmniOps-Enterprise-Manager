@@ -2,6 +2,13 @@
 # این پروژه منطبق با معماری Flask Blueprints طراحی شده و می‌تواند به صورت سرور پایتون یا در کانتینر اوبونتو اجرا شود.
 
 import os
+import sys
+
+# Ensure project root directory is at the beginning of sys.path
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+
 from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
 
